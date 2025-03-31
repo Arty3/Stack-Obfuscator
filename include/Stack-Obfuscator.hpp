@@ -675,7 +675,7 @@ namespace __StackObfuscator
 		class SafeCall
 		{
 		private:
-			Callable*	f;
+			Callable* f;
 
 		public:
 			__forceinline SafeCall(Callable* f) noexcept : f(f)
