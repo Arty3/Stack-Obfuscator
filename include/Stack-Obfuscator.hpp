@@ -35,6 +35,9 @@ enum class CallingConvention : unsigned __int8
 	__STDCALL,
 #ifndef _MANAGED
 	__VECTORCALL,
+#else
+	__CLRCALL,
+#endif
 #endif
 #ifndef _M_X64
 	__FASTCALL,
@@ -101,6 +104,8 @@ enum class LastThreadStatus : unsigned __int8
 #define	OBFUSCATE_THISCALL(ret, name)	OBFUSCATE_CALL(ret, CallingConvention::__THISCALL,		name)
 #ifndef	_MANAGED
 #define	OBFUSCATE_VECTORCALL(ret, name)	OBFUSCATE_CALL(ret, CallingConvention::__VECTORCALL,	name)
+#else
+#define	OBFUSCATE_CLRCALL(ret, name)	OBFUSCATE_CALL(ret, CallingConvention::__CLRCALL,		name)
 #endif
 
 #ifdef _KERNEL_MODE
@@ -415,6 +420,8 @@ namespace __StackObfuscator
 	}
 #endif
 
+		/* Doesn't protect against value manipulation */
+		/* See https://github.com/DontCallMeLuca/Stack-Protector */
 		static __forceinline void __verify_return_addr(void* addr)
 		{
 			if (!addr)
@@ -588,6 +595,7 @@ namespace __StackObfuscator
 #endif
 					__verify_return_addr(ret_addr);
 					__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+
 					return;
 				}
 				else
@@ -599,10 +607,41 @@ namespace __StackObfuscator
 #endif
 					__verify_return_addr(ret_addr);
 					__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+
+					return ret;
+				}
+			}
+#else
+			else if constexpr (cc == CallingConvention::__CLRCALL)
+			{
+				auto function = reinterpret_cast<RetType(__clrcall*)(remove_reference_t<Args>...)>(f);
+				if constexpr (is_same<RetType, void>)
+				{
+					function(forward<Args>(args)...);
+					*(uintptr_t*)ret_addr = tmp ^ xor_key;
+#ifdef _KERNEL_MODE
+					KeMemoryBarrier();
+#endif
+					__verify_return_addr(ret_addr);
+					__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+
+					return;
+				}
+				else
+				{
+					RetType ret = function(forward<Args>(args)...);
+					*(uintptr_t*)ret_addr = tmp ^ xor_key;
+#ifdef _KERNEL_MODE
+					KeMemoryBarrier();
+#endif
+					__verify_return_addr(ret_addr);
+					__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+
 					return ret;
 				}
 			}
 #endif
+
 #ifndef _M_X64
 			else if constexpr (cc == CallingConvention::__FASTCALL)
 			{
