@@ -86,6 +86,7 @@ The header's API is primarily macro based:
 - `OBFUSCATE_FASTCALL` - Obfuscate a `fastcall` calling convention function call (only x32)
 - `OBFUSCATE_THISCALL` - Obfuscate a `thiscall` calling convention function call (Class member calls)
 - `OBFUSCATE_VECTORCALL` - Obfuscate a `vectorcall` calling convention function call
+- `OBFUSCATE_CLRCALL` - Obfuscate a `clrcall` calling convention function call
 - `OBFUSCATOR_LAST_STATE` - The last internal library state
 
 Kernel specific:
@@ -168,6 +169,7 @@ Assume `OBFUSCATE_FUNCTION` is inserted/removed between examples:
 
 - No C support (for now)
 - Not foolproof, no solution ever is
+- CLR has limited support and testing
 - Only for Windows and the MSVC compiler
 - Manually distinguish calling convetion via macros
 - Some key functions do not have Control Flow Guard (CFG) enabled
