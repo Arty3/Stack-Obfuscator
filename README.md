@@ -1,6 +1,6 @@
-<h1 align="center">✨ Stack Obfuscator (Kernel & User) ✨</h1>
+<h1 align="center">✨ Stack Obfuscator ✨</h1>
 
-<h6 align="center"><em>High performance anti-analysis header for Windows</em></h6>
+<h6 align="center"><em>High performance anti-analysis header for Windows (Kernel & User)</em></h6>
 
 ## 📝 Overview
 
