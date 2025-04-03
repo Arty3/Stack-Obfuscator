@@ -78,26 +78,30 @@ OBFUSCATE_STDCALL(void, SleepPtr)(1000);
 
 ### 🌐 API
 
-The header's API is primarily macro based:
+#### The header's API is primarily macro based:
 
-- `OBFUSCATE_FUNCTION` - Obfuscates a function's return address
-- `OBFUSCATE_CDECL` - Obfuscate a `cdecl` calling convention function call (Default C convention)
-- `OBFUSCATE_STDCALL` - Obfuscate a `stdcall` calling convention function call (NTAPI)
-- `OBFUSCATE_FASTCALL` - Obfuscate a `fastcall` calling convention function call (only x32)
-- `OBFUSCATE_THISCALL` - Obfuscate a `thiscall` calling convention function call (Class member calls)
-- `OBFUSCATE_VECTORCALL` - Obfuscate a `vectorcall` calling convention function call
-- `OBFUSCATE_CLRCALL` - Obfuscate a `clrcall` calling convention function call
-- `OBFUSCATOR_LAST_STATE` - The last internal library state
+| Definition | Description |
+|------------|-------------|
+| `OBFUSCATE_FUNCTION` | Obfuscates a function's return address |
+| `OBFUSCATE_CDECL` | Obfuscate a `cdecl` calling convention function call (Default C convention) |
+| `OBFUSCATE_STDCALL` | Obfuscate a `stdcall` calling convention function call (NTAPI) |
+| `OBFUSCATE_FASTCALL` | Obfuscate a `fastcall` calling convention function call (only x32) |
+| `OBFUSCATE_THISCALL` | Obfuscate a `thiscall` calling convention function call (Class member calls) |
+| `OBFUSCATE_VECTORCALL` | Obfuscate a `vectorcall` calling convention function call |
+| `OBFUSCATE_CLRCALL` | Obfuscate a `clrcall` calling convention function call |
+| `OBFUSCATOR_LAST_STATE` | The last internal library state |
 
-Kernel specific:
+#### Kernel specific:
 
-- `REGISTER_OBFUSCATOR_THREAD_CLEANUP` - Register kernel thread cleanup
-- `UNREGISTER_OBFUSCATOR_THREAD_CLEANUP` - Unregister kernel thread cleanup
-- `ALLOW_TLS_OVERWRITE` - Allow the library to override the thread's local storage (Required for states)
-- `LAST_THREAD_STATE` - Latest library specific thread state
-- `OBFUSCATOR_TLS_OFFSET` - The library's thread local storage offset
+| Definition | Description |
+|------------|-------------|
+| `REGISTER_OBFUSCATOR_THREAD_CLEANUP` | Register kernel thread cleanup |
+| `UNREGISTER_OBFUSCATOR_THREAD_CLEANUP` | Unregister kernel thread cleanup |
+| `ALLOW_TLS_OVERWRITE` | Allow the library to override the thread's local storage (Required for states) |
+| `LAST_THREAD_STATE` | Latest library specific thread state |
+| `OBFUSCATOR_TLS_OFFSET` | The library's thread local storage offset |
 
-Status codes:
+#### Status codes:
 
 - `ObfuscateStatus` - Enum type for the internal library state codes:
 
@@ -169,15 +173,12 @@ Assume `OBFUSCATE_FUNCTION` is inserted/removed between examples:
 
 - No C support (for now)
 - Not foolproof, no solution ever is
-- CLR has limited support and testing
-- Only for Windows and the MSVC compiler
+- Only for Windows 10 or above and the MSVC compiler
 - Manually distinguish calling convetion via macros
 - Some key functions do not have Control Flow Guard (CFG) enabled
-- Doesn't support managed (.NET) code, though basic support exists
+- Limited support for managed (.NET) code, not thoroughly tested
 
 ## 🔧 Technical Design & Implementation Details
-
-###### _Warning: Only pain and suffering ahead_
 
 ### Foundation
 
