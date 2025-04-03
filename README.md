@@ -23,13 +23,16 @@
 - **Unique thread-local encryption management**
 - **Highly optimized through compiler-time resolution**
 
-## 🛠 Requirements
+## 🚀 Installation
+
+### 🛠 Requirements
 - MSVC Compiler
 - Windows 10 or above
 - C++20 support (Visual Studio 2019 16.8 or newer)
 
-## 🚀 Installation
-This module is a header-only module, simply include [Stack-Obfuscator.hpp](./include/Stack-Obfuscator.hpp) in your project:
+### 🌌 Implementation
+
+This module is a header-only implementation, simply include [Stack-Obfuscator.hpp](./include/Stack-Obfuscator.hpp) in your project:
 
 ```cpp
 #include "Stack-Obfuscator.hpp"

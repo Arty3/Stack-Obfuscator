@@ -3,7 +3,7 @@
 /*
 	- License: GNU GENERAL PUBLIC LICENSE v3.0
 	- Author: https://github.com/DontCallMeLuca
-	- Requires: C++20 or above, requires Windows 10 or above
+	- Requires: C++20 or above, Windows 10 or above
 */
 
 #pragma once
@@ -37,7 +37,6 @@ enum class CallingConvention : unsigned __int8
 	__VECTORCALL,
 #else
 	__CLRCALL,
-#endif
 #endif
 #ifndef _M_X64
 	__FASTCALL,
