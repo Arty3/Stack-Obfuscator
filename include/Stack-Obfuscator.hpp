@@ -133,9 +133,6 @@ namespace __StackObfuscator
 			return __LAST_STATE;
 		}
 #else
-		static constexpr const ULONG __ALLOC_TAG = '_OBF';
-		static_assert(__ALLOC_TAG, "__ALLOC_TAG must not be 0");
-
 		typedef unsigned __int64 uintptr_t;
 
 		LastThreadStatus	__LAST_THREAD_STATE		= LastThreadStatus::UNINITIALIZED_GLOBAL;
@@ -506,7 +503,7 @@ namespace __StackObfuscator
 
 		template <CallingConvention cc, typename RetType, typename Callable, typename... Args>
 		__declspec(guard(nocf)) __declspec(safebuffers)
-		RetType ShellCodeGenerator(Callable* f, Args&&... args) noexcept
+		RetType ShellCodeManager(Callable* f, Args&&... args) noexcept
 		{
 			OBFUSCATE_FUNCTION;
 
@@ -734,7 +731,7 @@ namespace __StackObfuscator
 					return RetType();
 				}
 
-				return ShellCodeGenerator<cc, RetType, Callable, Args...>(f, forward<Args>(args)...);
+				return ShellCodeManager<cc, RetType, Callable, Args...>(f, forward<Args>(args)...);
 			}
 		};
 	}
