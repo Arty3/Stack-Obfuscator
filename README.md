@@ -104,33 +104,37 @@ OBFUSCATE_STDCALL(void, SleepPtr)(1000);
 | `LAST_THREAD_STATE` | Latest library specific thread state |
 | `OBFUSCATOR_TLS_OFFSET` | The library's thread local storage offset |
 
-#### Status codes:
+#### Status Codes Reference:
 
-- `ObfuscateStatus` - Enum type for the internal library state codes:
+##### ObfuscateStatus
 
-```cpp
-SUCCEEDED,
-INITIALIZED,
-PENDING_CALL,
-UNINITIALIZED_TLS,
-INVALID_ENCRYPTION,
-INVALID_FUNCTION_ADDRESS,
-WEAK_ENCRYPTION_FALLBACK,
-CORRUPT_KEY_OR_STACK_ADDR,
-INVALID_CALLING_CONVENTION,
-UNINITIALIZED_STACK_CLEANUP,
-```
+Enum type representing the internal library state codes.
 
-- `LastThreadStatus` - Enum type for the internal library thread state (Kernel-mode only):
+| Value | Description |
+|-------|-------------|
+| SUCCEEDED | Operation completed successfully |
+| INITIALIZED | Obfuscation has been properly initialized |
+| PENDING_CALL | Obfuscated function is waiting to be called |
+| UNINITIALIZED_TLS | Thread Local Storage has not been initialized |
+| INVALID_ENCRYPTION | Encryption is invalid or corrupted |
+| INVALID_FUNCTION_ADDRESS | Function pointer address is invalid |
+| WEAK_ENCRYPTION_FALLBACK | Secure encryption failed, using fallback method |
+| CORRUPT_KEY_OR_STACK_ADDR | Encryption key or stack address is corrupted |
+| INVALID_CALLING_CONVENTION | Function calling convention is incompatible |
+| UNINITIALIZED_STACK_CLEANUP | Stack cleanup procedure not initialized |
 
-```cpp
-INIT_SUCCESS,
-INIT_FAILURE,
-THREAD_TERMINATED,
-THREAD_IS_CREATING,
-THREAD_IS_TERMINATING,
-UNINITIALIZED_GLOBAL
-```
+##### LastThreadStatus
+
+Enum type representing the internal library thread state (Kernel-mode only).
+
+| Value | Description |
+|-------|-------------|
+| INIT_SUCCESS | Thread initialization completed successfully |
+| INIT_FAILURE | Thread initialization failed |
+| THREAD_TERMINATED | Thread has been terminated |
+| THREAD_IS_CREATING | Thread is in creation process |
+| THREAD_IS_TERMINATING | Thread is in termination process |
+| UNINITIALIZED_GLOBAL | Global thread variables not initialized |
 
 ### ⭐ Best Practices
 
