@@ -9,22 +9,26 @@
 #pragma once
 
 #ifndef _MSC_VER
-# error "This translation unit requires the MSVC compiler"
+#error "This translation unit requires the MSVC compiler"
 #endif
 
 #if !_HAS_CXX20 && defined(_MSVC_LANG) && _MSVC_LANG < 202002L
-# error "This translation unit requires C++20 or above."
+#error "This translation unit requires C++20 or above."
 #endif
 
 #if (NTDDI_VERSION < NTDDI_WIN10_VB)
-# error "This translation unit requires Windows 10 or above."
+#error "This translation unit requires Windows 10 or above."
+#endif
+
+#ifdef _M_IX86
+#pragma message("WARNING: 32-bit architecture lacks support.")
 #endif
 
 #ifdef _KERNEL_MODE
-# include <ntifs.h>
+#include <ntifs.h>
 #else
-# include <Windows.h>
-# include <random>
+#include <Windows.h>
+#include <random>
 #endif
 
 #include <Intrin.h>
@@ -33,10 +37,10 @@ enum class CallingConvention : unsigned __int8
 {
 	__CDECL,
 	__STDCALL,
-#ifndef _MANAGED
-	__VECTORCALL,
-#else
+#ifdef _MANAGED
 	__CLRCALL,
+#else
+	__VECTORCALL,
 #endif
 #ifndef _M_X64
 	__FASTCALL,
@@ -78,14 +82,17 @@ enum class LastThreadStatus : unsigned __int8
 # define __TLS_SLOTS_OFFSET	0x0E10
 #endif
 
-/* Defined as PVOID TlsSlots[0x40]; */
+/* Defined as `PVOID TlsSlots[0x40];` */
 #define __TLS_SLOTS_SIZE	(0x40 * sizeof(PVOID))
 
 #endif
 
+/* See the API section in README.md */
+
 #define OBFUSCATE_FUNCTION	__StackObfuscator::detail::ObfuscateFunction \
 								obfuscate(_AddressOfReturnAddress())
 
+/* Better practice to use the other macros instead. */
 #define OBFUSCATE_CALL(ret_type, convention, name)		\
 		(__StackObfuscator::detail::SafeCall<ret_type,	\
 		convention, __StackObfuscator::detail::			\
@@ -108,83 +115,84 @@ enum class LastThreadStatus : unsigned __int8
 #endif
 
 #ifdef _KERNEL_MODE
-# define REGISTER_OBFUSCATOR_THREAD_CLEANUP		__StackObfuscator::detail::__RegisterThreadCleanup()
-# define UNREGISTER_OBFUSCATOR_THREAD_CLEANUP	__StackObfuscator::detail::__UnregisterThreadCleanup()
-# define ALLOW_TLS_OVERWRITE					__StackObfuscator::detail::__ALLOW_TLS_OVERWRITE
-# define LAST_THREAD_STATE						__StackObfuscator::detail::__LAST_THREAD_STATE
-# define OBFUSCATOR_TLS_OFFSET					sizeof(__StackObfuscator::detail::ThreadState)
+#define REGISTER_OBFUSCATOR_THREAD_CLEANUP		__StackObfuscator::detail::__RegisterThreadCleanup()
+#define UNREGISTER_OBFUSCATOR_THREAD_CLEANUP	__StackObfuscator::detail::__UnregisterThreadCleanup()
+#define ALLOW_TLS_OVERWRITE						__StackObfuscator::detail::__ALLOW_TLS_OVERWRITE
+#define LAST_THREAD_STATE						__StackObfuscator::detail::__LAST_THREAD_STATE
+#define OBFUSCATOR_TLS_OFFSET					sizeof(__StackObfuscator::detail::ThreadState)
 #endif
 
-/* Avoid using the namespace */
+/* Avoid using the implementation directly */
 namespace __StackObfuscator
 {
 	inline namespace detail
 	{
 #ifndef _KERNEL_MODE
-		ObfuscateStatus thread_local __LAST_STATE = ObfuscateStatus::INITIALIZED;
+	ObfuscateStatus thread_local __LAST_STATE = ObfuscateStatus::INITIALIZED;
 
-		__forceinline void __SET_LAST_STATE(ObfuscateStatus status) noexcept
-		{
-			__LAST_STATE = status;
-		}
+	__forceinline void __SET_LAST_STATE(ObfuscateStatus status) noexcept
+	{
+		__LAST_STATE = status;
+	}
 
-		__forceinline ObfuscateStatus __GET_LAST_STATE(void) noexcept
-		{
-			return __LAST_STATE;
-		}
+	__forceinline ObfuscateStatus __GET_LAST_STATE(void) noexcept
+	{
+		return __LAST_STATE;
+	}
 #else
-		typedef unsigned __int64 uintptr_t;
+	typedef unsigned __int64 uintptr_t;
 
-		LastThreadStatus	__LAST_THREAD_STATE		= LastThreadStatus::UNINITIALIZED_GLOBAL;
-		BOOLEAN				__ALLOW_TLS_OVERWRITE	= TRUE;
-		KSPIN_LOCK			__LAST_THREAD_STATE_LOCK;
+	LastThreadStatus	__LAST_THREAD_STATE		= LastThreadStatus::UNINITIALIZED_GLOBAL;
+	BOOLEAN				__ALLOW_TLS_OVERWRITE	= TRUE;
+	KSPIN_LOCK			__LAST_THREAD_STATE_LOCK;
 
-		struct DECLSPEC_ALIGN(64) ThreadState
-		{
-			UINT64				s[4];
-			UINT64				current_key;
-			BOOLEAN				initialized;
-			::ObfuscateStatus	last_state;
-		};
+	/* Important kernel mode memory alignment */
+	struct DECLSPEC_ALIGN(64) ThreadState
+	{
+		UINT64				s[4];			/* Key related data		*/
+		UINT64				current_key;	/* Thread local key		*/
+		BOOLEAN				initialized;	/* Thread init state	*/
+		::ObfuscateStatus	last_state;		/* Last internal state	*/
+	};
 
-		static_assert(
-			sizeof(ThreadState) <= __TLS_SLOTS_SIZE,
-			"Structure must fit within TLS allocation"
+	static_assert(
+		sizeof(ThreadState) <= __TLS_SLOTS_SIZE,
+		"Structure must fit within TLS allocation"
+	);
+
+	__forceinline ThreadState* getThreadState(void) noexcept
+	{
+		if (!__ALLOW_TLS_OVERWRITE)
+			return nullptr;
+
+		static const PVOID _TLS_LOCATION = (PVOID)(
+			(ULONG_PTR)PsGetCurrentThreadTeb() + __TLS_SLOTS_OFFSET
 		);
 
-		__forceinline ThreadState* getThreadState(void) noexcept
-		{
-			if (!__ALLOW_TLS_OVERWRITE)
-				return nullptr;
+		return (ThreadState*)_TLS_LOCATION;
+	}
 
-			static const PVOID _TLS_LOCATION = (PVOID)(
-				(ULONG_PTR)PsGetCurrentThreadTeb() + __TLS_SLOTS_OFFSET
-			);
+	__forceinline void __SET_LAST_STATE(ObfuscateStatus status) noexcept
+	{
+		ThreadState* __restrict state = getThreadState();
 
-			return (ThreadState*)_TLS_LOCATION;
-		}
+		if (!state)
+			return;
 
-		__forceinline void __SET_LAST_STATE(ObfuscateStatus status) noexcept
-		{
-			ThreadState* __restrict state = getThreadState();
+		state->last_state = status;
 
-			if (!state)
-				return;
+		KeMemoryBarrier();
+	}
 
-			state->last_state = status;
+	__forceinline ObfuscateStatus __GET_LAST_STATE(void) noexcept
+	{
+		ThreadState* __restrict state = getThreadState();
 
-			KeMemoryBarrier();
-		}
+		if (!state)
+			return ObfuscateStatus::UNINITIALIZED_TLS;
 
-		__forceinline ObfuscateStatus __GET_LAST_STATE(void) noexcept
-		{
-			ThreadState* __restrict state = getThreadState();
-
-			if (!state)
-				return ObfuscateStatus::UNINITIALIZED_TLS;
-
-			return state->last_state;
-		}
+		return state->last_state;
+	}
 #endif
 	template <class _Ty>
 	struct remove_reference
@@ -223,7 +231,7 @@ namespace __StackObfuscator
 	constexpr _Ty&& forward(remove_reference_t<_Ty>&& _Arg) noexcept
 	{
 		static_assert(
-			!is_lvalue_reference_v<_Ty>,
+			!detail::is_lvalue_reference_v<_Ty>,
 			"Cannot forward an lvalue reference"
 		);
 		return static_cast<_Ty&&>(_Arg);
@@ -235,10 +243,11 @@ namespace __StackObfuscator
 	template <typename T>
 	static constexpr bool is_same<T, T> = true;
 
-#ifdef _KERNEL_MODE
+	/* Encryption is done manually in kernel mode due to lack of STL */
 	class KeyGenerator
 	{
 	private:
+#ifdef _KERNEL_MODE
 		static __forceinline UINT64 rotl(const UINT64 x, int k) noexcept
 		{
 			return (x << k) | (x >> (64 - k));
@@ -274,8 +283,26 @@ namespace __StackObfuscator
 
 			return result;
 		}
+#else
+		using distribution = std::uniform_int_distribution<uintptr_t>;
 
+		static inline thread_local uintptr_t		current_key;
+		static inline thread_local bool				initialized;
+		static inline thread_local std::mt19937_64	thread_gen;
+		static inline thread_local distribution		thread_dis;
+
+		static __forceinline void initThreadLocal(void) noexcept
+		{
+			if (initialized)
+				return;
+
+			std::random_device rd;
+			thread_gen.seed(rd());
+			initialized = true;
+		}
+#endif
 	public:
+#ifdef _KERNEL_MODE
 		static __forceinline void initThreadStateKey(ThreadState* __restrict state) noexcept
 		{
 			if (state->initialized)
@@ -306,28 +333,7 @@ namespace __StackObfuscator
 
 			return state->current_key;
 		}
-	};
-#else
-	class KeyGenerator
-	{
-	private:
-		using distribution = std::uniform_int_distribution<uintptr_t>;
-
-		static inline thread_local uintptr_t		current_key;
-		static inline thread_local bool				initialized;
-		static inline thread_local std::mt19937_64	thread_gen;
-		static inline thread_local distribution		thread_dis;
-
-		static __forceinline void initThreadLocal(void) noexcept
-		{
-			if (initialized)
-				return;
-
-			std::random_device rd;
-			thread_gen.seed(rd());
-			initialized = true;
-		}
-	public:
+	#else
 		static __forceinline uintptr_t getKey(void) noexcept
 		{
 			if (current_key)
@@ -341,7 +347,7 @@ namespace __StackObfuscator
 			return current_key;
 		}
 	};
-#endif
+
 #ifdef _KERNEL_MODE
 	__forceinline void initThreadState(void) noexcept
 	{
@@ -416,285 +422,82 @@ namespace __StackObfuscator
 	}
 #endif
 
-		/* Doesn't protect against value manipulation */
-		/* See https://github.com/DontCallMeLuca/Stack-Protector */
-		static __forceinline void __verify_return_addr(void* addr)
+	/* Doesn't protect against value manipulation */
+	/* See https://github.com/DontCallMeLuca/Stack-Protector */
+	static __forceinline void __verify_return_addr(void* addr)
+	{
+		/* We know the addr should never be 0x0 */
+		if (!addr)
+		{
+			__SET_LAST_STATE(ObfuscateStatus::CORRUPT_KEY_OR_STACK_ADDR);
+#ifdef _KERNEL_MODE
+			/* BSOD (Bluescreen) */
+			KeBugCheckEx(
+				CRITICAL_STRUCTURE_CORRUPTION,
+				(ULONG_PTR)_ReturnAddress(),
+				(ULONG_PTR)0xC0000000,
+				(ULONG_PTR)addr, 0
+			);
+#else
+			__fastfail(FAST_FAIL_STACK_COOKIE_CHECK_FAILURE);
+#endif
+		}
+	}
+
+	class ObfuscateFunction
+	{
+	private:
+		const uintptr_t	xor_key;
+		void*			ret_addr	= nullptr;
+		bool			initialized	= false;
+		uintptr_t		tmp			= 0;
+
+	public:
+		__declspec(guard(nocf))
+		__forceinline ObfuscateFunction(void* addr) noexcept
+			: ret_addr(addr), xor_key(KeyGenerator::getKey())
 		{
 			if (!addr)
 			{
-				__SET_LAST_STATE(ObfuscateStatus::CORRUPT_KEY_OR_STACK_ADDR);
-#ifdef _KERNEL_MODE
-				KeBugCheckEx(
-					CRITICAL_STRUCTURE_CORRUPTION,
-					(ULONG_PTR)_ReturnAddress(),
-					(ULONG_PTR)0xC0000000,
-					(ULONG_PTR)addr, 0
-				);
-#else
-				__fastfail(FAST_FAIL_STACK_COOKIE_CHECK_FAILURE);
-#endif
+				__SET_LAST_STATE(ObfuscateStatus::INVALID_FUNCTION_ADDRESS);
+				return;
 			}
-		}
-
-		class ObfuscateFunction
-		{
-		private:
-			const uintptr_t	xor_key;
-			void*			ret_addr	= nullptr;
-			bool			initialized	= false;
-			uintptr_t		tmp			= 0;
-
-		public:
-			__declspec(guard(nocf))
-			__forceinline ObfuscateFunction(void* addr) noexcept
-				: ret_addr(addr), xor_key(KeyGenerator::getKey())
-			{
-				if (!addr)
-				{
-					__SET_LAST_STATE(ObfuscateStatus::INVALID_FUNCTION_ADDRESS);
-					return;
-				}
-
-				if (!xor_key)
-				{
-					__SET_LAST_STATE(ObfuscateStatus::INVALID_ENCRYPTION);
-					return;
-				}
-
-				tmp = (*(uintptr_t*)ret_addr) ^ xor_key;
-				*(uintptr_t*)ret_addr = 0;
-
-				initialized = true;
-
-#ifdef _KERNEL_MODE
-				KeMemoryBarrier();
-#endif
-				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
-			}
-
-			__declspec(guard(nocf)) __forceinline ~ObfuscateFunction(void) noexcept
-			{
-				if (!initialized)
-				{
-					ObfuscateStatus status = __GET_LAST_STATE();
-
-					if (status != ObfuscateStatus::INVALID_FUNCTION_ADDRESS &&
-						status != ObfuscateStatus::INVALID_ENCRYPTION)
-						__SET_LAST_STATE(ObfuscateStatus::UNINITIALIZED_STACK_CLEANUP);
-
-					return;
-				}
-
-				if (!xor_key)
-				{
-					__SET_LAST_STATE(ObfuscateStatus::INVALID_ENCRYPTION);
-					return;
-				}
-
-				*(uintptr_t*)ret_addr = tmp ^ xor_key;
-
-#ifdef _KERNEL_MODE
-				KeMemoryBarrier();
-#endif
-				__verify_return_addr(ret_addr);
-				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
-			}
-		};
-
-		template <CallingConvention cc, typename RetType, typename Callable, typename... Args>
-		__declspec(guard(nocf)) __declspec(safebuffers)
-		RetType ShellCodeManager(Callable* f, Args&&... args) noexcept
-		{
-			OBFUSCATE_FUNCTION;
-
-			const uintptr_t	xor_key = KeyGenerator::getKey();
 
 			if (!xor_key)
 			{
 				__SET_LAST_STATE(ObfuscateStatus::INVALID_ENCRYPTION);
-				return RetType();
+				return;
 			}
 
-			void* __restrict ret_addr = _AddressOfReturnAddress();
-			uintptr_t tmp = *(uintptr_t*)ret_addr ^ xor_key;
-
+			tmp = (*(uintptr_t*)ret_addr) ^ xor_key;
 			*(uintptr_t*)ret_addr = 0;
+
+			initialized = true;
 
 #ifdef _KERNEL_MODE
 			KeMemoryBarrier();
 #endif
+			__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+		}
 
-			if constexpr (cc == CallingConvention::__CDECL)
+		__declspec(guard(nocf)) __forceinline ~ObfuscateFunction(void) noexcept
+		{
+			if (!initialized)
 			{
-				auto function = reinterpret_cast<RetType(__cdecl*)(remove_reference_t<Args>...)>(f);
-				if constexpr (is_same<RetType, void>)
-				{
-					function(forward<Args>(args)...);
-					*(uintptr_t*)ret_addr = tmp ^ xor_key;
-#ifdef _KERNEL_MODE
-					KeMemoryBarrier();
-#endif
-					__verify_return_addr(ret_addr);
-					__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
-					return;
-				}
-				else
-				{
-					RetType ret = function(forward<Args>(args)...);
-					*(uintptr_t*)ret_addr = tmp ^ xor_key;
-#ifdef _KERNEL_MODE
-					KeMemoryBarrier();
-#endif
-					__verify_return_addr(ret_addr);
-					__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
-					return ret;
-				}
+				ObfuscateStatus status = __GET_LAST_STATE();
+
+				if (status != ObfuscateStatus::INVALID_FUNCTION_ADDRESS &&
+					status != ObfuscateStatus::INVALID_ENCRYPTION)
+					__SET_LAST_STATE(ObfuscateStatus::UNINITIALIZED_STACK_CLEANUP);
+
+				return;
 			}
 
-			else if constexpr (cc == CallingConvention::__STDCALL)
+			if (!xor_key)
 			{
-				auto function = reinterpret_cast<RetType(__stdcall*)(remove_reference_t<Args>...)>(f);
-				if constexpr (is_same<RetType, void>)
-				{
-					function(forward<Args>(args)...);
-					*(uintptr_t*)ret_addr = tmp ^ xor_key;
-#ifdef _KERNEL_MODE
-					KeMemoryBarrier();
-#endif
-					__verify_return_addr(ret_addr);
-					__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
-					return;
-				}
-				else
-				{
-					RetType ret = function(forward<Args>(args)...);
-					*(uintptr_t*)ret_addr = tmp ^ xor_key;
-#ifdef _KERNEL_MODE
-					KeMemoryBarrier();
-#endif
-					__verify_return_addr(ret_addr);
-					__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
-					return ret;
-				}
+				__SET_LAST_STATE(ObfuscateStatus::INVALID_ENCRYPTION);
+				return;
 			}
-
-#ifndef _MANAGED
-			else if constexpr (cc == CallingConvention::__VECTORCALL)
-			{
-				auto function = reinterpret_cast<RetType(__vectorcall*)(remove_reference_t<Args>...)>(f);
-				if constexpr (is_same<RetType, void>)
-				{
-					function(forward<Args>(args)...);
-					*(uintptr_t*)ret_addr = tmp ^ xor_key;
-#ifdef _KERNEL_MODE
-					KeMemoryBarrier();
-#endif
-					__verify_return_addr(ret_addr);
-					__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
-
-					return;
-				}
-				else
-				{
-					RetType ret = function(forward<Args>(args)...);
-					*(uintptr_t*)ret_addr = tmp ^ xor_key;
-#ifdef _KERNEL_MODE
-					KeMemoryBarrier();
-#endif
-					__verify_return_addr(ret_addr);
-					__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
-
-					return ret;
-				}
-			}
-#else
-			else if constexpr (cc == CallingConvention::__CLRCALL)
-			{
-				auto function = reinterpret_cast<RetType(__clrcall*)(remove_reference_t<Args>...)>(f);
-				if constexpr (is_same<RetType, void>)
-				{
-					function(forward<Args>(args)...);
-					*(uintptr_t*)ret_addr = tmp ^ xor_key;
-#ifdef _KERNEL_MODE
-					KeMemoryBarrier();
-#endif
-					__verify_return_addr(ret_addr);
-					__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
-
-					return;
-				}
-				else
-				{
-					RetType ret = function(forward<Args>(args)...);
-					*(uintptr_t*)ret_addr = tmp ^ xor_key;
-#ifdef _KERNEL_MODE
-					KeMemoryBarrier();
-#endif
-					__verify_return_addr(ret_addr);
-					__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
-
-					return ret;
-				}
-			}
-#endif
-
-#ifndef _M_X64
-			else if constexpr (cc == CallingConvention::__FASTCALL)
-			{
-				auto function = reinterpret_cast<RetType(__fastcall*)(remove_reference_t<Args>...)>(f);
-				if constexpr (is_same<RetType, void>)
-				{
-					function(forward<Args>(args)...);
-					*(uintptr_t*)ret_addr = tmp ^ xor_key;
-#ifdef _KERNEL_MODE
-					KeMemoryBarrier();
-#endif
-					__verify_return_addr(ret_addr);
-					__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
-					return;
-				}
-				else
-				{
-					RetType ret = function(forward<Args>(args)...);
-					*(uintptr_t*)ret_addr = tmp ^ xor_key;
-#ifdef _KERNEL_MODE
-					KeMemoryBarrier();
-#endif
-					__verify_return_addr(ret_addr);
-					__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
-					return ret;
-				}
-			}
-#endif
-
-			else if constexpr (cc == CallingConvention::__THISCALL)
-			{
-				auto function = reinterpret_cast<RetType(__thiscall*)(remove_reference_t<Args>...)>(f);
-				if constexpr (is_same<RetType, void>)
-				{
-					function(forward<Args>(args)...);
-					*(uintptr_t*)ret_addr = tmp ^ xor_key;
-#ifdef _KERNEL_MODE
-					KeMemoryBarrier();
-#endif
-					__verify_return_addr(ret_addr);
-					__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
-					return;
-				}
-				else
-				{
-					RetType ret = function(forward<Args>(args)...);
-					*(uintptr_t*)ret_addr = tmp ^ xor_key;
-#ifdef _KERNEL_MODE
-					KeMemoryBarrier();
-#endif
-					__verify_return_addr(ret_addr);
-					__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
-					return ret;
-				}
-			}
-
-			__SET_LAST_STATE(ObfuscateStatus::INVALID_CALLING_CONVENTION);
 
 			*(uintptr_t*)ret_addr = tmp ^ xor_key;
 
@@ -702,37 +505,244 @@ namespace __StackObfuscator
 			KeMemoryBarrier();
 #endif
 			__verify_return_addr(ret_addr);
-			if constexpr (!is_same<RetType, void>)
-				return RetType();
+			__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+		}
+	};
+
+	template <CallingConvention cc, typename RetType, typename Callable, typename... Args>
+	__declspec(guard(nocf)) __declspec(safebuffers)
+	RetType ShellCodeManager(Callable* f, Args&&... args) noexcept
+	{
+		OBFUSCATE_FUNCTION;
+
+		const uintptr_t	xor_key = KeyGenerator::getKey();
+
+		if (!xor_key)
+		{
+			__SET_LAST_STATE(ObfuscateStatus::INVALID_ENCRYPTION);
+			return RetType();
 		}
 
-		template<typename RetType, CallingConvention cc, class Callable>
-		class SafeCall
+		void* __restrict ret_addr = _AddressOfReturnAddress();
+		uintptr_t tmp = *(uintptr_t*)ret_addr ^ xor_key;
+
+		*(uintptr_t*)ret_addr = 0;
+
+#ifdef _KERNEL_MODE
+		KeMemoryBarrier();
+#endif
+
+		/* Unfortunately C++ only supports constexpr for if statements */
+		/* So readability & portability is thrown out the window */
+		/* In this case its appropriate to do so for efficiency */
+
+		if constexpr (cc == CallingConvention::__CDECL)
 		{
-		private:
-			Callable* f;
-
-		public:
-			__forceinline SafeCall(Callable* f) noexcept : f(f)
+			auto function = reinterpret_cast<RetType(__cdecl*)(remove_reference_t<Args>...)>(f);
+			if constexpr (detail::is_same<RetType, void>)
 			{
-				OBFUSCATE_FUNCTION;
+				function(detail::forward<Args>(args)...);
+				*(uintptr_t*)ret_addr = tmp ^ xor_key;
+#ifdef _KERNEL_MODE
+				KeMemoryBarrier();
+#endif
+				__verify_return_addr(ret_addr);
+				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+				return;
+			}
+			else
+			{
+				RetType ret = function(detail::forward<Args>(args)...);
+				*(uintptr_t*)ret_addr = tmp ^ xor_key;
+#ifdef _KERNEL_MODE
+				KeMemoryBarrier();
+#endif
+				__verify_return_addr(ret_addr);
+				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+				return ret;
+			}
+		}
 
-				__SET_LAST_STATE(ObfuscateStatus::PENDING_CALL);
+		else if constexpr (cc == CallingConvention::__STDCALL)
+		{
+			auto function = reinterpret_cast<RetType(__stdcall*)(remove_reference_t<Args>...)>(f);
+			if constexpr (detail::is_same<RetType, void>)
+			{
+				function(detail::forward<Args>(args)...);
+				*(uintptr_t*)ret_addr = tmp ^ xor_key;
+#ifdef _KERNEL_MODE
+				KeMemoryBarrier();
+#endif
+				__verify_return_addr(ret_addr);
+				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+				return;
+			}
+			else
+			{
+				RetType ret = function(detail::forward<Args>(args)...);
+				*(uintptr_t*)ret_addr = tmp ^ xor_key;
+#ifdef _KERNEL_MODE
+				KeMemoryBarrier();
+#endif
+				__verify_return_addr(ret_addr);
+				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+				return ret;
+			}
+		}
+
+#ifdef _MANAGED
+		else if constexpr (cc == CallingConvention::__CLRCALL)
+		{
+			auto function = reinterpret_cast<RetType(__clrcall*)(remove_reference_t<Args>...)>(f);
+			if constexpr (detail::is_same<RetType, void>)
+			{
+				function(detail::forward<Args>(args)...);
+				*(uintptr_t*)ret_addr = tmp ^ xor_key;
+#ifdef _KERNEL_MODE
+				KeMemoryBarrier();
+#endif
+				__verify_return_addr(ret_addr);
+				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+
+				return;
+			}
+			else
+			{
+				RetType ret = function(detail::forward<Args>(args)...);
+				*(uintptr_t*)ret_addr = tmp ^ xor_key;
+#ifdef _KERNEL_MODE
+				KeMemoryBarrier();
+#endif
+				__verify_return_addr(ret_addr);
+				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+
+				return ret;
+			}
+		}
+#else
+		else if constexpr (cc == CallingConvention::__VECTORCALL)
+		{
+			auto function = reinterpret_cast<RetType(__vectorcall*)(remove_reference_t<Args>...)>(f);
+			if constexpr (detail::is_same<RetType, void>)
+			{
+				function(detail::forward<Args>(args)...);
+				*(uintptr_t*)ret_addr = tmp ^ xor_key;
+#ifdef _KERNEL_MODE
+				KeMemoryBarrier();
+#endif
+				__verify_return_addr(ret_addr);
+				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+
+				return;
+			}
+			else
+			{
+				RetType ret = function(detail::forward<Args>(args)...);
+				*(uintptr_t*)ret_addr = tmp ^ xor_key;
+#ifdef _KERNEL_MODE
+				KeMemoryBarrier();
+#endif
+				__verify_return_addr(ret_addr);
+				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+
+				return ret;
+			}
+		}
+#endif
+#ifndef _M_X64
+		else if constexpr (cc == CallingConvention::__FASTCALL)
+		{
+			auto function = reinterpret_cast<RetType(__fastcall*)(remove_reference_t<Args>...)>(f);
+			if constexpr (detail::is_same<RetType, void>)
+			{
+				function(detail::forward<Args>(args)...);
+				*(uintptr_t*)ret_addr = tmp ^ xor_key;
+#ifdef _KERNEL_MODE
+				KeMemoryBarrier();
+#endif
+				__verify_return_addr(ret_addr);
+				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+				return;
+			}
+			else
+			{
+				RetType ret = function(detail::forward<Args>(args)...);
+				*(uintptr_t*)ret_addr = tmp ^ xor_key;
+#ifdef _KERNEL_MODE
+				KeMemoryBarrier();
+#endif
+				__verify_return_addr(ret_addr);
+				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+				return ret;
+			}
+		}
+#endif
+		else if constexpr (cc == CallingConvention::__THISCALL)
+		{
+			auto function = reinterpret_cast<RetType(__thiscall*)(remove_reference_t<Args>...)>(f);
+			if constexpr (detail::is_same<RetType, void>)
+			{
+				function(detail::forward<Args>(args)...);
+				*(uintptr_t*)ret_addr = tmp ^ xor_key;
+#ifdef _KERNEL_MODE
+				KeMemoryBarrier();
+#endif
+				__verify_return_addr(ret_addr);
+				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+				return;
+			}
+			else
+			{
+				RetType ret = function(detail::forward<Args>(args)...);
+				*(uintptr_t*)ret_addr = tmp ^ xor_key;
+#ifdef _KERNEL_MODE
+				KeMemoryBarrier();
+#endif
+				__verify_return_addr(ret_addr);
+				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+				return ret;
+			}
+		}
+
+		__SET_LAST_STATE(ObfuscateStatus::INVALID_CALLING_CONVENTION);
+
+		*(uintptr_t*)ret_addr = tmp ^ xor_key;
+
+#ifdef _KERNEL_MODE
+		KeMemoryBarrier();
+#endif
+		__verify_return_addr(ret_addr);
+		if constexpr (!detail::is_same<RetType, void>)
+			return RetType();
+	}
+
+	template<typename RetType, CallingConvention cc, class Callable>
+	class SafeCall
+	{
+	private:
+		Callable* f;
+
+	public:
+		__forceinline SafeCall(Callable* f) noexcept : f(f)
+		{
+			OBFUSCATE_FUNCTION;
+
+			__SET_LAST_STATE(ObfuscateStatus::PENDING_CALL);
+		}
+
+		template<typename... Args>
+		__forceinline RetType operator()(Args&&... args) noexcept
+		{
+			OBFUSCATE_FUNCTION;
+
+			if (!f)
+			{
+				__SET_LAST_STATE(ObfuscateStatus::INVALID_FUNCTION_ADDRESS);
+				return RetType();
 			}
 
-			template<typename... Args>
-			__forceinline RetType operator()(Args&&... args) noexcept
-			{
-				OBFUSCATE_FUNCTION;
-
-				if (!f)
-				{
-					__SET_LAST_STATE(ObfuscateStatus::INVALID_FUNCTION_ADDRESS);
-					return RetType();
-				}
-
-				return ShellCodeManager<cc, RetType, Callable, Args...>(f, forward<Args>(args)...);
-			}
-		};
+			return ShellCodeManager<cc, RetType, Callable, Args...>(f, detail::forward<Args>(args)...);
+		}
+	};
 	}
 }
