@@ -490,7 +490,7 @@ header as well, which will critically improve security standards.
 <br>
 The header won't be implemented here, as its a whole new project.
 <br>
-Instead, I will add a link to it here, once its made: [AntiDebug](https://github.com/DontCallMeLuca/Anti-Debug)
+Instead, I will add a link to it here, once its made: [AntiDebug](https://github.com/Arty3/Anti-Debug)
 
 ## 📃 License
 This project uses the `GNU GENERAL PUBLIC LICENSE v3.0` license
