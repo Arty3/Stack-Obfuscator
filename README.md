@@ -195,34 +195,6 @@ When a function is called, it is pushed to the top of the call stack where then,
 <br>
 The call stack is a data structure which in this context is used to control the execution flow of a program.
 
-We can visualize it as follows:
-
-```mermaid
-flowchart TD
-    Start([Program Start]) --> Main[main function]
-    Main --> |"Push main frame"| Stack1[Stack: main]
-    
-    Main --> |"Call functionA"| FuncA[functionA]
-    FuncA --> |"Push functionA frame"| Stack2[Stack: functionA main]
-    
-    FuncA --> |"Call functionB"| FuncB[functionB]
-    FuncB --> |"Push functionB frame"| Stack3[Stack: funcB funcA main]
-    
-    FuncB --> |"functionB completes"| PopB[Pop functionB frame]
-    PopB --> Stack4[Stack: functionA main]
-    
-    Stack4 --> |"functionA completes"| PopA[Pop functionA frame]
-    PopA --> Stack5[Stack: main]
-    
-    Stack5 --> |"main completes"| PopMain[Pop main frame]
-    PopMain --> EmptyStack[Empty Stack]
-    
-    EmptyStack --> End([Program End])
-    
-    classDef stackNode fill:#222,stroke:#fff,stroke-width:2px;
-    class Stack1,Stack2,Stack3,Stack4,Stack5,EmptyStack stackNode;
-```
-
 These are critical structures to a program's execution flow which an analysis tool uses to make sense of a program. Because we are trying to prevent this, we need to obfuscate key components to this structure, preventing analysis.
 <br>
 It is important to note that the stack grows backwards. Meaning, the stack expands from higher memory addresses to lower memory addresses as new stack frames are added.
