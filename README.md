@@ -192,7 +192,6 @@ Assume `OBFUSCATE_FUNCTION` is inserted/removed between examples:
 At its core, the functionality is based off of obfuscating key aspects of the stack frame, particularly the return addresses.
 <br>
 When a function is called, it is pushed to the top of the call stack where then, the stack frame is allocated. The stack frame, represents a function call in a program's execution. Once the function returns, the stack frame is deallocated and it is then popped from the call stack.
-<br>
 The call stack is a data structure which in this context is used to control the execution flow of a program.
 
 These are critical structures to a program's execution flow which an analysis tool uses to make sense of a program. Because we are trying to prevent this, we need to obfuscate key components to this structure, preventing analysis.
