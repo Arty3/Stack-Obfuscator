@@ -1,34 +1,98 @@
 <h1 align="center">✨ Stack Obfuscator ✨</h1>
 
-<h6 align="center"><em>High performance anti-analysis header for Windows (Kernel & User)</em></h6>
+<h6 align="center"><em>High performance anti-analysis header for Windows (Kernel & User) and Linux systems</em></h6>
 
 ## 📝 Overview
 
-[Stack-Obfuscator.hpp](./include/Stack-Obfuscator.hpp) is a header-only C++ library for both user mode and kernel mode that helps protect critical functions in your program from reverse engineering, heuristic detection, static detection and much more. It works by temporarily encrypting function return addresses on the stack during execution making it significantly harder for all analysis tools to trace the execution flow of your program. Further, it also proxies external calls your program makes essentially masking any external behavior you might be doing. No system call or API call will point from or back to your program.
+[Stack-Obfuscator.hpp](./include/Stack-Obfuscator.hpp) is a header-only C++ library for Windows (user & kernel mode) and Linux systems that helps protect critical functions in your program from reverse engineering, heuristic detection, static detection and much more. It works by temporarily encrypting function return addresses on the stack during execution making it significantly harder for all analysis tools to trace the execution flow of your program. Further, it also proxies external calls your program makes essentially masking any external behavior you might be doing. No system call or API call will point from or back to your program.
 
 ## ✨ Features
-- **Return address protection**
-- **Cryptographically secure**
-- **Thread safe**
-- **Thread unique**
-- **Multiple calling convention support**
-- **Kernel & user mode support**
-- **Low performance overhead**
-- **No external dependencies**
-- **Supports both x32 and x64**
-- **Modern C++ design**
-- **Thoroughly tested**
+
+### 🔒 Security & Protection
+- **Advanced stack obfuscation** with XOR encryption
+- **Return address protection** and verification
+- **Cryptographically secure key generation** using hardware entropy sources
+- **Anti-tampering detection** with immediate termination
+- **Cross-platform CFI/CFG controls** (Clang CFI, GCC CET, MSVC CFG)
+- **Entropy quality validation** with pattern detection
+- **Stack corruption detection** and prevention
+
+### 🚀 Performance & Efficiency  
 - **Zero allocation performance overhead**
-- **Virtually no runtime exceptions**
-- **Unique thread-local encryption management**
-- **Highly optimized through compiler-time resolution**
+- **Aggressive compiler inlining** for minimal runtime cost
+- **Hardware-accelerated entropy** (RDTSC, performance counters)
+- **Compile-time optimization** through constexpr branching
+- **Cache-friendly memory layout** with proper alignment
+- **Minimal runtime exceptions** with comprehensive error handling
+
+### 🌐 Cross-Platform Excellence
+- **Universal compiler support** (MSVC, GCC, Clang with auto-detection)
+- **Multi-architecture support** (x64, x86, ARM64)
+- **Platform-native optimizations** (Windows, Linux)
+- **ABI-aware calling conventions** (Microsoft ABI, System V ABI)
+- **Complete calling convention coverage** (cdecl, stdcall, fastcall, thiscall, vectorcall, ms_abi, sysv_abi)
+- **Graceful feature degradation** (e.g., GCC vectorcall handling)
+
+### 🧵 Threading & Concurrency
+- **Thread-safe design** with spinlock protection
+- **Thread-unique encryption keys** with per-thread entropy
+- **Kernel mode thread lifecycle management**
+- **TLS-based state management** with proper cleanup
+- **Race condition prevention** in critical sections
+
+### 🏗️ Architecture & Design
+- **Modern C++20 design** with template metaprogramming
+- **Header-only implementation** with zero external dependencies
+- **STL-free kernel mode** with custom implementations
+- **RAII-compliant** with automatic cleanup
+- **Clean abstraction layers** for maintainability
+- **Enterprise-grade error handling** with detailed status reporting
+
+### 🔧 Advanced Features
+- **Kernel and user mode support** with unified API
+- **Windows kernel driver compatibility** with TLS slot management
+- **Frame pointer validation** with runtime detection
+- **Xoshiro256 PRNG implementation** for high-quality key generation
+- **Multiple entropy fallback strategies** for edge cases
+- **Comprehensive debug support** with frame pointer validation warnings
+
+### 📊 Quality & Reliability
+- **Production-ready stability** with extensive safety limits
+- **Defensive programming** with bounds checking and validation
+- **Cross-compiler compatibility** testing
+- **Memory safety guarantees** with proper alignment and bounds
+- **Professional documentation** with clear usage examples
+- **Expert-level systems programming** implementation
 
 ## 🚀 Installation
 
 ### 🛠 Requirements
-- MSVC Compiler
-- Windows 10 or above
-- C++20 support (Visual Studio 2019 16.8 or newer)
+
+#### 📋 Core Requirements
+- **C++20 or above** (required for all platforms)
+- **Frame pointer support** (`-fno-omit-frame-pointer` for GCC/Clang builds)
+
+#### 🖥️ Supported Compilers
+- **Microsoft Visual C++** (MSVC 2019 16.8+)
+- **Clang** (7.0+)
+- **GCC** (9.0+)
+
+#### 🌐 Supported Platforms
+- **Windows 10 or above** (x64, x86, ARM64)
+- **Linux** (x64, x86, ARM64)
+- **Windows Kernel Mode** (driver development with WDK)
+
+#### 🏗️ Architecture Support
+- **x86-64** (primary target, full feature support)
+- **x86** (32-bit, limited testing with warnings)
+- **ARM64** (AArch64, full feature support)
+
+#### ⚙️ Build Configuration Notes
+- **GCC/Clang**: Compile with `-fno-omit-frame-pointer` for reliable frame pointer access
+- **Vectorcall support**: Use Clang instead of GCC (GCC lacks vectorcall support)
+- **Kernel mode**: Requires Windows Driver Kit (WDK) and appropriate kernel headers
+- **CFI support**: Clang with `-fsanitize=cfi -flto` for enhanced control flow integrity
+- **CET support**: GCC 9+ or Clang 7+ with `-fcf-protection` for Intel CET
 
 ### 🌌 Implementation
 
@@ -85,24 +149,26 @@ OBFUSCATE_STDCALL(void, SleepPtr)(1000);
 
 | Definition | Description |
 |------------|-------------|
-| `OBFUSCATE_FUNCTION` | Obfuscates a function's return address |
-| `OBFUSCATE_CDECL` | Obfuscate a `cdecl` calling convention function call (Default C convention) |
-| `OBFUSCATE_STDCALL` | Obfuscate a `stdcall` calling convention function call (NTAPI) |
-| `OBFUSCATE_FASTCALL` | Obfuscate a `fastcall` calling convention function call (only x32) |
-| `OBFUSCATE_THISCALL` | Obfuscate a `thiscall` calling convention function call (Class member calls) |
-| `OBFUSCATE_VECTORCALL` | Obfuscate a `vectorcall` calling convention function call |
-| `OBFUSCATE_CLRCALL` | Obfuscate a `clrcall` calling convention function call |
-| `OBFUSCATOR_LAST_STATE` | The last internal library state |
+| `OBFUSCATE_FUNCTION` | Obfuscates a function's return address with automatic cleanup |
+| `OBFUSCATE_CDECL(ret, name)` | Obfuscate a `cdecl` calling convention function call (Default C convention) |
+| `OBFUSCATE_STDCALL(ret, name)` | Obfuscate a `stdcall` calling convention function call (Windows API/NTAPI) |
+| `OBFUSCATE_FASTCALL(ret, name)` | Obfuscate a `fastcall` calling convention function call (x86 32-bit only) |
+| `OBFUSCATE_THISCALL(ret, name)` | Obfuscate a `thiscall` calling convention function call (C++ member functions) |
+| `OBFUSCATE_VECTORCALL(ret, name)` | Obfuscate a `vectorcall` calling convention function call (Windows, Clang only) |
+| `OBFUSCATE_CLRCALL(ret, name)` | Obfuscate a `clrcall` calling convention function call (.NET managed code) |
+| `OBFUSCATE_MICROSOFT_ABI(ret, name)` | Obfuscate using Microsoft ABI (Cross-platform Windows compatibility) |
+| `OBFUSCATE_LINUX_ABI(ret, name)` | Obfuscate using System V ABI (Unix/Linux native calling convention) |
+| `OBFUSCATOR_LAST_STATE` | Get the last internal library operation status |
 
-#### Kernel specific:
+#### Windows Kernel specific:
 
 | Definition | Description |
 |------------|-------------|
-| `REGISTER_OBFUSCATOR_THREAD_CLEANUP` | Register kernel thread cleanup |
-| `UNREGISTER_OBFUSCATOR_THREAD_CLEANUP` | Unregister kernel thread cleanup |
-| `ALLOW_TLS_OVERWRITE` | Allow the library to override the thread's local storage (Required for states) |
-| `LAST_THREAD_STATE` | Latest library specific thread state |
-| `OBFUSCATOR_TLS_OFFSET` | The library's thread local storage offset |
+| `REGISTER_OBFUSCATOR_THREAD_CLEANUP` | Register kernel thread lifecycle cleanup handler |
+| `UNREGISTER_OBFUSCATOR_THREAD_CLEANUP` | Unregister kernel thread lifecycle cleanup handler |
+| `ALLOW_TLS_OVERWRITE` | Allow the library to override the thread's local storage (Required for state management) |
+| `LAST_THREAD_STATE` | Latest library specific thread initialization and lifecycle state |
+| `OBFUSCATOR_TLS_OFFSET` | The library's thread local storage structure size offset |
 
 #### Status Codes Reference:
 
@@ -138,14 +204,43 @@ Enum type representing the internal library thread state (Kernel-mode only).
 
 ### ⭐ Best Practices
 
-- Call `OBFUSCATE_FUNCTION;` at the start of the function
-- Obfuscate all external calls to ensure maximum obfuscation
-- (Kernel) Call `REGISTER_OBFUSCATOR_THREAD_CLEANUP;` on driver entry or thread creation
-- Use the correct calling convention macro to avoid undefined behavior (e.g. stdcall for the NTAPI)
-- Using `OBFUSCATOR_LAST_STATE == ObfuscateStatus::SUCCEEDED` to verify success.
-- Use `baseTlsPtr + OBFUSCATOR_TLS_OFFSET` for kernel mode TLS storage.
-- Avoid storing a proxy call object, call it directly.
-- Use different protection methods in combination
+#### 🔒 Core Usage
+- Call `OBFUSCATE_FUNCTION;` at the start of sensitive functions for automatic return address protection
+- Obfuscate all external calls to ensure maximum stack protection coverage
+- Use the correct calling convention macro to avoid undefined behavior (e.g., `OBFUSCATE_STDCALL` for Windows API/NTAPI)
+- Verify operation success using `OBFUSCATOR_LAST_STATE == ObfuscateStatus::SUCCEEDED`
+- Avoid storing proxy call objects - call obfuscated functions directly for optimal security
+
+#### 🧵 Threading & Concurrency
+- Use thread-safe initialization patterns when working with multi-threaded applications
+- Each thread automatically gets unique encryption keys - no manual coordination needed
+- Monitor `LAST_THREAD_STATE` in kernel mode to ensure proper thread initialization
+
+#### 🔧 Windows Kernel Mode Specific
+- Call `REGISTER_OBFUSCATOR_THREAD_CLEANUP;` in your driver entry point or thread creation routine
+- Call `UNREGISTER_OBFUSCATOR_THREAD_CLEANUP;` during driver unload for proper cleanup
+- Ensure `ALLOW_TLS_OVERWRITE` is enabled before using kernel mode features
+- Use `baseTlsPtr + OBFUSCATOR_TLS_OFFSET` for calculating kernel mode TLS storage locations
+- Monitor kernel mode status through `LAST_THREAD_STATE` for debugging and validation
+
+#### 🌐 Cross-Platform Development
+- Use `OBFUSCATE_MICROSOFT_ABI` on Linux when calling Windows-compatible functions (Wine/CrossOver)
+- Use `OBFUSCATE_SYSV_ABI` for explicit Unix/Linux native calling convention adherence
+- Compile GCC/Clang builds with `-fno-omit-frame-pointer` for reliable frame pointer access
+- Use Clang instead of GCC when `vectorcall` support is required
+
+#### 🏗️ Architecture & Performance
+- Combine multiple protection methods for defense-in-depth security
+- Place `OBFUSCATE_FUNCTION` early in functions to maximize protection coverage
+- Use appropriate calling convention macros to maintain ABI compatibility
+- Leverage compiler optimizations - the library is designed for aggressive inlining
+- Monitor entropy quality through status codes and handle `WEAK_ENCRYPTION_FALLBACK` appropriately
+
+#### 🐛 Debugging & Validation
+- Check `OBFUSCATOR_LAST_STATE` after critical operations for error detection
+- Use debug builds to enable frame pointer validation warnings
+- Monitor for `CORRUPT_KEY_OR_STACK_ADDR` status which indicates potential attacks
+- Validate return address integrity in security-critical applications
 
 ## 🧪 Proof of Concept
 
@@ -178,27 +273,40 @@ Assume `OBFUSCATE_FUNCTION` is inserted/removed between examples:
 
 ## ⚠ Limitations
 
-- No C support (for now)
-- Not foolproof, no solution ever is
-- Only for Windows 10 or above and the MSVC compiler
-- Manually distinguish calling convetion via macros
-- Some key functions do not have Control Flow Guard (CFG) enabled
-- Limited support for managed (.NET) code, not thoroughly tested
+#### 🔧 Platform & Language Support
+- **No C interface** (C++ only - C wrapper planned for future release)
+- **Limited platform support** - Windows and Linux only (no macOS, BSD, Android, or embedded systems)
+- **Architecture constraints** - x86 32-bit support is limited with warnings
+
+#### 🛡️ Security Considerations  
+- **Not foolproof** - No security solution ever is; this is one layer in a defense-in-depth strategy
+- **Frame pointer dependency** - GCC/Clang builds require `-fno-omit-frame-pointer` for reliable operation
+- **Compiler-specific features** - Some advanced features unavailable on older compiler versions
+- **Hardware entropy dependency** - Fallback mechanisms activate on systems without modern entropy sources
+
+#### 🚀 Performance & Compatibility
+- **GCC vectorcall limitation** - Use Clang for `vectorcall` support (GCC doesn't support this calling convention)
+- **Kernel mode complexity** - Requires careful TLS management and proper cleanup registration
+- **Debug overhead** - Frame pointer validation in debug builds adds minimal runtime cost
+- **Cross-compilation constraints** - ABI mixing between platforms requires careful consideration
+
+#### 🔄 Operational Limitations
+- **Single-threaded key generation** - Each thread gets unique keys but initial generation is sequential
+- **Memory protection scope** - Protects return addresses and call chains, not general memory corruption
+- **Static analysis evasion** - Effective against runtime attacks but not compile-time analysis
+- **Exception handling** - Minimal exception usage may limit integration with exception-heavy codebases
 
 ## 🔧 Technical Design & Implementation Details
 
 ### Foundation
 
-At its core, the functionality is based off of obfuscating key aspects of the stack frame, particularly the return addresses.
-<br>
-When a function is called, it is pushed to the top of the call stack where then, the stack frame is allocated. The stack frame, represents a function call in a program's execution. Once the function returns, the stack frame is deallocated and it is then popped from the call stack.
-The call stack is a data structure which in this context is used to control the execution flow of a program.
+At its core, the functionality is based on obfuscating critical aspects of the stack frame, particularly the return addresses, while providing comprehensive cross-platform and cross-ABI compatibility.
 
-These are critical structures to a program's execution flow which an analysis tool uses to make sense of a program. Because we are trying to prevent this, we need to obfuscate key components to this structure, preventing analysis.
-<br>
-It is important to note that the stack grows backwards. Meaning, the stack expands from higher memory addresses to lower memory addresses as new stack frames are added.
-<br>
-We can visualize it as follows:
+When a function is called, it is pushed to the top of the call stack where the stack frame is allocated. The stack frame represents a function call in a program's execution. Once the function returns, the stack frame is deallocated and popped from the call stack. The call stack is a data structure that controls the execution flow of a program.
+
+These are critical structures to a program's execution flow which analysis tools use to understand program behavior. By obfuscating key components of this structure, we prevent static and dynamic analysis while maintaining full functionality across different platforms and calling conventions.
+
+The stack grows backwards, expanding from higher memory addresses to lower memory addresses as new stack frames are added:
 
 ```mermaid
 graph TD
@@ -217,179 +325,170 @@ graph TD
 ```
 <br>
 
-When calling a function, the stack pointer (`ESP` on x86) behaves as follows:
+When calling a function, the stack pointer behavior varies by architecture and calling convention:
 
 ```asm
-; Calling a function (stack grows downward)
-push ebp         ; Save caller's base pointer
-mov ebp, esp     ; Set new base pointer
-sub esp, 16      ; Allocate local variables (stack moves down)
+; x86-64 System V ABI (Linux)
+push rbp         ; Save caller's base pointer
+mov rbp, rsp     ; Set new base pointer
+sub rsp, 32      ; Allocate local variables (stack moves down)
 ; Function executes...
-mov esp, ebp     ; Restore stack pointer (stack moves up)
-pop ebp          ; Restore caller's base pointer
+mov rsp, rbp     ; Restore stack pointer
+pop rbp          ; Restore caller's base pointer
+ret              ; Return to caller
+
+; x86-64 Microsoft ABI (Windows)
+push rbp         ; Save caller's base pointer
+mov rbp, rsp     ; Set new base pointer
+sub rsp, 40      ; Different alignment requirements
+; Function executes...
+add rsp, 40      ; Restore stack pointer
+pop rbp          ; Restore caller's base pointer
 ret              ; Return to caller
 ```
 
-Based on this, we know that if two given functions `functionA` and `functionB` are called in the order of `functionA` calls `functionB`, we know that `functionB` is pushed to the top of the stack, and once it terminates execution it is popped, pushing `functionA` back to the top.
+### Cross-Platform Architecture & ABI Support
 
-When trying to identify key points of execution, an analysis tool will need to determine how this point of execution is called, in order to determine how it is used, etc. By encrypting the return address of the function, we can essentially prevent this, as the now encrypted return address will not point to any meaningful location in memory.
+The library implements comprehensive support for multiple
+ABIs to ensure compatibility across platforms:
 
-A practical example of this would be to obfuscate a key execution point, such as license validation. As a basic example, we can assume the bad actor is attempting to identify this key validation step and skip it. By obufuscating the control flow of the program entirely, the bad actor is faced with a much more challenging problem in trying to identify any meaningful information.
+**Microsoft ABI (Windows)**: Native Windows calling conventions with proper
+parameter passing and stack management
 
-This can also be applied to heuristic / vector detection methods, where by observing the external calls a program makes, an analysis tool can identify any potentially significant behaviors. By obfuscating the return addresses, these external calls will not point from nor back to the program, essentially voiding any attribution to the call.
+**System V ABI (Unix/Linux)**: POSIX-compliant calling conventions for
+Unix-like systems
 
-### Encryption
+**Cross-ABI Compatibility**: Ability to use the Microsoft ABI on linux
+(Wine/CrossOver compatibility) and explicit System V ABI selection
 
-In user-mode, the module simply uses the standard library to create a cryptographically secure key. This key is stored locally per thread, meaning that the same function will have a different key depending on the thread it is executed in. Therefore, each thread is unique from one another. On the kernel level, due to the absence of the standard library, the module uses extensive methods to improve on the cryptography's entropy, such as using unique runtime components such as the precise execution time, process id, thread id, hardware clock speed, etc. It then goes trough an efficient process to generate sufficient entropy, finally, a key is generated. If at any point the encryption is invalid, the program will come to a stop. This is to ensure that the encryption cannot be reversed engineered into a consistent result.
+This dual-ABI approach enables the library to work seamlessly in cross-compilation
+scenarios and mixed-platform environments, providing enterprise-grade portability.
 
-### Basic Obfuscation
+### Advanced Encryption & Entropy Management
 
-At the most basic level, the obfuscation is performed by generating a cryptographically secure key, and applying it via an xor gate onto the return address of the stack frame. Therefore, only the caller (the library) knows the return address, restoring it once the execution is complete.
+**User-Mode Encryption**: Utilizes the standard library's `std::random_device` and
+`std::mt19937_64` for cryptographically secure key generation. Each thread maintains
+unique keys with automatic entropy validation.
 
-### Obfuscating Calls
+**Kernel-Mode Encryption**: Implements a custom xoshiro256 PRNG with multiple
+entropy sources:
 
-In order to obfuscate external calls, we must handle the stack frame ourselves. The library wraps the function in an object, which overloads the call operator, allowing us to implement our own logic. When calling, first, the address of the function is ensured to be valid, then the shellcode for the function is generated, in such a way that it maintains the `e8` and `e9` relative jumps in place in memory. First, we must keep in mind the calling convention of the function, to ensure the responsibility of cleaning up the stack frame and avoid undefined behavior. We can then reinterpret the function's address into its own signature applying the correct calling convention.
-We can then perform the raw shellcode call, before restoring the original return address and providing the correct return value, once all values are ensured to be correct, the program returns to its normal execution flow.
+- High-resolution timestamp
+- Performance counter queries
+- Process and thread identifiers
+- System time (temporal entropy)
+- Additional entropy injection during key generation
 
-### Thread & Memory Safety
+**Entropy Quality Validation**: Multi-layered entropy verification including:
 
-The libray does not make use of the heap, it only works within the bounds of the stack, therefore there is no chance for a memory leak to occur. However, to ensure correct synchronization of critical operations, particularly in the kernel where this is critical, several memory barriers are set in order to preserve any kind of compiler or runtime reordering of operations. This is highly critical to logic of the library as it deals with highly critical system structures.
-<br><br>
-To fully guarantee thread uniqueness, each thread is self sustainable and independent from one another. Therefore, the only synchronization required is at the kernel level, where a thread status variable is present, therefore highly explicit spinlocks and barriers are applied to ensure no race conditions are possible when setting the latest thread state.
+- Bit distribution analysis using hardware `popcount` instrictions (for CPUs past 2007)
+- Pattern detection for weak keys (repeated bytes, arithmetic progressions)
+- Fallback mechanisms for systems without hardware popcount support
+- Automatic weak key rejection with status reporting
 
-Threads in kernel mode make efficient use of Thread Local Storage (TLS). In the kernel, the TEB (Thread Environment Block) differs from user mode, where in user mode one might access it and manage it quite easily to the publicly exposed and documented stuctures and functions. This is not the case in kernel mode, where, while available, it is undocumented and hidden. The library makes use of some specific macro definitions and reverse engineered TEB inforamtion to access TLS appropriately, where the TLS pointer is defined as `PVOID TlsSlots[0x40];` which allows us to understand its size on both x32 and x64 architectures. We can then use TLS to ensure thread independence.
+### Frame Pointer Management & Return Address Protection
 
-### Template Metaprogramming
+The library implements sophisticated frame pointer detection and validation:
 
-The library makes extensive use of compile-time determinations, this significantly reduces runtime performance overhead. Since function calls are already defined at compile time, we can transfer this information through the use of templates to key functions in the library, allowing us to determine most of the execution already at compile time. By employing the `constexpr` (constant expression) keyword, we can use the known compile-time constants to define the result of known compile time expressions.
+**Cross-Platform Frame Pointer Access:**
 
-Due to the absence of the standard library in the kernel, much of the compile time utility functions had to be rewritten to ensure valid preservation. These functions are all meta programming functions which allow us to define part of the runtime logic at compile time (e.g. return type determination, calling convention, etc.).
+- **x86-64**: Uses the `%rbp` register
+- **x86**: Uses the `%ebp` register with 32-bit considerations
+- **ARM64**: Uses the `x29` frame pointer register
 
-A critical aspect which is required to take into account, is the preservation of lvalues and rvalues. These define how expressions behave in assignment and evaluation. An lvalue is an expression taht represents an object with a persistent memory address, it's defined using the assignment operator (`=`); these have storage (location in memory). An rvalue is a temporary value that does not have a memory address. It cannot be assigned to and it is usually on the right side of an assignment. Both lvalues and rvalues can be literals or expressions.
+**Frame Pointer Validation**: Runtime heuristic verification ensuring:
 
-When handling values, we must ensure that proper lvalue and rvalue states are preserved before calling the given function. If improper handling of these occurs, it is likely that the compiler will fail to interpret their types correctly. Therefore, it is critical that the forward operation occurs successfully. For this reason, extensive static assert statements (compile time assertions) are placed to ensure that no issues will occur at runtime, instead, if an issue is present, it will be detected at compile time.
+- Frame pointer is above stack pointer (proper stack direction)
+- Reasonable stack frame sizes (preventing corruption detection)
+- Proper pointer alignment for the target architecture
+- Debug-mode runtime warning for invalid frame pointer configurations
 
-## 🔍 Execution Flow Visualizations
+### Enhanced Calling Convention Support
 
-###### _Note that these are highly simplified visualizations_
+The library provides comprehensive calling convention support with proper ABI adherence:
 
-### User-Mode Visualization
+**Traditional Calling Conventions**:
+- `cdecl`: The standard C calling convention with caller stack cleanup
+- `stdcall`: Windows API calling convention with callee stack cleanup
+- `fastcall`: Register-based parameter passing (x86 32-bit)
+- `thiscall`: C++ member function calling convention (passing the 'this' pointer)
+- `vectorcall`: SIMD-optimized calling convention (Clang/MSVC only)
 
-```mermaid
-flowchart TD
-	Start([Start Obfuscation])
-	GetRetAddr[Get Return Address]
-	InitKey[Initialize XOR Key]
-	KeyCheck{Is Key Valid?}
-	AddrCheck{Is Address Valid?}
-	SaveEncrypt[Save & Encrypt Address]
-	SetZero[Set Return Address to 0]
-	CallFn[Call Target Function]
-	RestoreAddr[Restore Original Address]
-	VerifyAddr[Verify Return Address]
-	End([End Obfuscation])
-	Error([Error Handling])
+**ABI-Specific Conventions**:
+- `ms_abi`: The standard Microsoft ABI convention for cross-platform Windows compatibility
+- `sysv_abi`: The standard System V ABI convention for ELF-based Unix/Linux native compatibility
 
-	Start --> GetRetAddr
-	GetRetAddr --> InitKey
-	InitKey --> KeyCheck
-	KeyCheck -- No --> Error
-	KeyCheck -- Yes --> AddrCheck
-	AddrCheck -- No --> Error
-	AddrCheck -- Yes --> SaveEncrypt
-	SaveEncrypt --> SetZero
-	SetZero --> CallFn
-	CallFn --> RestoreAddr
-	RestoreAddr --> VerifyAddr
-	VerifyAddr -- Valid --> End
-	VerifyAddr -- Invalid --> Error
+**Graceful Degradation**: Automatic handling of unsupported features such as
+compiler convention limitations, with appropriate fallbacks.
 
-	GetRetAddr
-	InitKey
-	KeyCheck
-	AddrCheck
-	SaveEncrypt
-	SetZero
+### Template Metaprogramming & Compile-Time Optimization
 
-	CallFn
+The library employs extensive compile-time optimization through template metaprogramming:
 
-	RestoreAddr
-	VerifyAddr
+**Custom STL Implementation**: Complete reimplementation of STL components for
+kernel mode:
 
-	ErrorStates[Set Error Status]
-	Error --> ErrorStates
+- `remove_reference` and `remove_reference_t` for type reference manipulation
+- Perfect forwarding implementation with `forward()` function templates
+- `is_same` type trait for compile-time type comparison
+- `is_lvalue_reference_v` for reference type detection
 
-	%% Status Management
-	class ErrorStates,Error fill:#ffcccc,stroke:#ff0000
-```
+**Constexpr Optimization**: Aggressive use of the `constexpr` keyword for compile-time evaluation:
 
-### Kernel-Mode Visualization
+- Calling convention selection at compile time
+- Return type determination through template specialization
+- Compile-time constant propagation for performance optimization
 
-```mermaid
-flowchart TD
-	Start([Start Obfuscation])
-	TLSInit[Initialize Thread State]
-	CheckTLS{TLS Available?}
-	GetRetAddr[Get Return Address]
-	InitKey[Initialize XOR Key]
-	KeyCheck{Is Key Valid?}
-	AddrCheck{Is Address Valid?}
-	SaveEncrypt[Save & Encrypt Address]
-	SetZero[Set Return Address to 0]
-	MemBarrier1[Memory Barrier]
-	CallFn[Call Target Function]
-	RestoreAddr[Restore Original Address]
-	MemBarrier2[Memory Barrier]
-	VerifyAddr[Verify Return Address]
-	End([End Obfuscation])
-	Error([Error Handling])
-	BugCheck[Trigger Bug Check]
+**Static Assertions**: Comprehensive compile-time validation:
 
-	Start --> TLSInit
-	TLSInit --> CheckTLS
-	CheckTLS -- No --> Error
-	CheckTLS -- Yes --> GetRetAddr
-	GetRetAddr --> InitKey
-	InitKey --> KeyCheck
-	KeyCheck -- No --> Error
-	KeyCheck -- Yes --> AddrCheck
-	AddrCheck -- No --> Error
-	AddrCheck -- Yes --> SaveEncrypt
-	SaveEncrypt --> SetZero
-	SetZero --> MemBarrier1
-	MemBarrier1 --> CallFn
-	CallFn --> RestoreAddr
-	RestoreAddr --> MemBarrier2
-	MemBarrier2 --> VerifyAddr
-	VerifyAddr -- Valid --> End
-	VerifyAddr -- Invalid --> BugCheck
-	BugCheck --> Error
+- Type safety verification for template parameters
+- Platform compatibility checks
+- Calling convention compatibility validation
 
-	TLSInit
-	CheckTLS
-	GetRetAddr
-	InitKey
-	KeyCheck
-	AddrCheck
-	SaveEncrypt
-	SetZero
-	MemBarrier1
+### Thread Safety & Memory Management
 
-	CallFn
+**Zero-Allocation Design**: The library operates entirely within stack boundaries
+with no heap allocations, eliminating memory leak possibilities and improving cache
+locality.
 
-	RestoreAddr
-	MemBarrier2
-	VerifyAddr
+**Thread-Local Encryption**: Each thread maintains an independent encryption state:
 
-	ErrorStates[Set Error Status]
-	Error --> ErrorStates
+- **User Mode**: Thread-local storage for key management and state tracking
+- **Kernel Mode**: Custom TLS implementation using the Thread Environment Block (TEB)
 
-	%% Additional kernel-specific elements
-	class ThreadCreate,ThreadTerminate,KeyGen fill:#e6ffe6,stroke:#006600
-	class BugCheck fill:#ffcccc,stroke:#ff0000
-	class MemBarrier1,MemBarrier2 fill:#f9f9f9,stroke:#666666
-	class ErrorStates,Error fill:#ffcccc,stroke:#ff0000
-```
+**Kernel Mode TLS Management**:
+
+- Direct TEB access using undocumented Windows kernel structures
+- Custom TLS slot management with proper size validation
+- Thread lifecycle integration with kernel thread notification callbacks
+- Appropriate Thread State padding and packing ensuring safely aligned memory
+
+**Synchronization Primitives**:
+
+- Spinlock protection for critical kernel mode state changes
+- Lock-free design for performance-critical paths
+- Memory barrier placement ensuring correct accessing order
+
+### Security Mechanisms & Anti-Tampering
+
+**Return Address Verification**: Multi-stage verification of return address integrity:
+
+- Null pointer detection with immediate termination
+- Address range validation for stack corruption detection
+- Cryptographic verification of restored addresses
+
+**Anti-Analysis Techniques**:
+
+- XOR encryption of return addresses to break static analysis
+- Dynamic key generation preventing signature-based detection
+- Stack obfuscation disrupting call flow analysis
+- Control flow integrity protection through CFI/CFG integration
+
+**Immediate Termination on Compromise**:
+
+- **Windows User Mode**: `__fastfail()` with stack cookie failure code
+- **Windows Kernel Mode**: `KeBugCheckEx()` triggering a bluescreen
+- **Linux**: `SIGKILL` with unreachable code directive
 
 ## ✨ Future Improvements
 
@@ -439,12 +538,6 @@ I timed was of 4ms. Granted, having an AMD Ryzen 9 7950x helps a bit,
 but still, this performance overhead is negligible, I would need
 to carefully benchmark the solution before implementing it.
 
-### Performance Critical Discards
-Because of some performance overhead with some features, like
-status codes, a possible upgrade would be a compilation target
-which discards possibly redundant features,
-in an attempt to improve performance.
-
 ### C-Style API interface
 Currently, the header is only for C++ projects,
 this isn't really ideal for someone working in C.
@@ -454,16 +547,7 @@ can be done to support C projects.
 <br>
 The header would still need to be compiled via C++.
 
-### AntiDebug Measures
-This header helps with protecting against analysis, however,
-no solution is ever foolproof. I will create an AntiDebug
-header as well, which will critically improve security standards.
-<br>
-The header won't be implemented here, as its a whole new project.
-<br>
-Instead, I will add a link to it here, once its made: [AntiDebug](https://github.com/Arty3/Anti-Debug)
-
 ## 📃 License
-This project uses the `GNU GENERAL PUBLIC LICENSE v3.0` license
+This project uses the MIT License
 <br>
 For more info, please find the `LICENSE` file here: [License](LICENSE)
