@@ -158,7 +158,7 @@
 #endif
 
 #if defined(__COMPILER_MSVC_)
-#define __RETURN_ADDR_PTR()	_AddressOfReturnAddress()
+#define __RETURN_ADDR_PTR_()	_AddressOfReturnAddress()
 #elif defined(__COMPILER_CLANG_) || defined(__COMPILER_GCC_)
 namespace __STACK_FRAGILE__
 {
@@ -220,7 +220,7 @@ namespace __STACK_FRAGILE__
 	}
 }
 
-#define __RETURN_ADDR_PTR()	\
+#define __RETURN_ADDR_PTR_()	\
 	__STACK_FRAGILE__::__get_return_address_ptr()
 
 #endif
@@ -300,7 +300,7 @@ enum class LastThreadStatus : UINT8
 /* See the API section in README.md */
 
 #define OBFUSCATE_FUNCTION	__StackObfuscator::detail::ObfuscateFunction \
-								__obfuscate__(__RETURN_ADDR_PTR())
+								__obfuscate__(__RETURN_ADDR_PTR_())
 
 /* Better practice to use the other macros instead. */
 #define OBFUSCATE_CALL(ret_type, convention, name)		\
@@ -829,7 +829,7 @@ namespace __StackObfuscator
 
 	template <CallingConvention cc, typename RetType, typename Callable, typename... Args>
 	__NO_CFG_ __NO_STACK_PROTECT_
-	RetType ShellCodeManager(Callable* f, Args&&... args) noexcept
+	RetType ShellCodeManager(Calla__RETURN_ADDR_PTR_ble* f, Args&&... args) noexcept
 	{
 		OBFUSCATE_FUNCTION;
 
@@ -843,7 +843,7 @@ namespace __StackObfuscator
 			return RetType();
 		}
 
-		void* __RESTRICT_ ret_addr = __RETURN_ADDR_PTR();
+		void* __RESTRICT_ ret_addr = __RETURN_ADDR_PTR_();
 		__MEMORY_BARRIER_();
 		uintptr_t tmp = *(uintptr_t*)ret_addr ^ xor_key;
 		__MEMORY_BARRIER_();
