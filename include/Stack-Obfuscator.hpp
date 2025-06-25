@@ -473,8 +473,8 @@ namespace __StackObfuscator
 
 	/* Encryption is done manually in kernel mode due to lack of STL
 	 * Using xoshiro256 encryption implementation for fast generation,
-	 * good statistical properties and suitable for cryptographic keys.
-	 */
+	 * good statistical properties and suitable for cryptographic keys. */
+
 	class KeyGenerator
 	{
 	private:
@@ -849,9 +849,9 @@ namespace __StackObfuscator
 		__MEMORY_BARRIER_();
 		*(uintptr_t*)ret_addr = 0;
 
-		/* Unfortunately C++ only supports constexpr for if statements */
-		/* So readability & portability is thrown out the window */
-		/* In this case its appropriate to do so for efficiency */
+		/* Unfortunately C++ only supports constexpr for if statements
+		 * So readability & portability is thrown out the window
+		 * In this case its appropriate to do so for efficiency */
 
 		if constexpr (cc == CallingConvention::__CDECL)
 		{
