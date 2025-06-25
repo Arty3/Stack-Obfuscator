@@ -587,8 +587,8 @@ namespace __StackObfuscator
 			return popcount >= 20 && popcount <= 44;
 #else
 			/* For old CPUs without popcount: 
-			 * check if upper and lower halves are different
-			 */
+			 * check if upper and lower
+			 * halves are different */
 			uint32_t upper = (uint32_t)(key >> 32);
 			uint32_t lower = (uint32_t)(key & 0xFFFFFFFF);
 			
