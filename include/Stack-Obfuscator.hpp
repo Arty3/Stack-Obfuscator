@@ -186,7 +186,7 @@ namespace __STACK_FRAGILE__
 	void* __get_return_address_ptr(void)
 	{
 #pragma message("Remember to compile using `-fno-omit-frame-pointer` to ensure proper behavior.")
-#if defined(_DEBUG) || defined(__DEBUG) || defined(__DEBUG__) || defined(DEBUG) || !defined(NDEBUG)
+#if defined(_DEBUG) || defined(__DEBUG) || defined(__DEBUG__) || defined(DEBUG) && !defined(NDEBUG)
 		static int checked = 0;
 #endif
 		volatile void** frame_ptr;
@@ -202,7 +202,7 @@ namespace __STACK_FRAGILE__
 		if (!frame_ptr) __UNLIKELY_
 			return nullptr;
 
-#if defined(_DEBUG) || defined(__DEBUG) || defined(__DEBUG__) || defined(DEBUG) || !defined(NDEBUG)
+#if defined(_DEBUG) || defined(__DEBUG) || defined(__DEBUG__) || defined(DEBUG) && !defined(NDEBUG)
 		if (!checked)
 		{
 			if (!__STACK_FRAGILE__::__probably_has_frame_ptr(frame_ptr))
@@ -348,7 +348,7 @@ namespace __StackObfuscator
 	inline namespace detail
 	{
 #if !defined(__WINDOWS_KERNEL_)
-	ObfuscateStatus thread_local __LAST_STATE = ObfuscateStatus::INITIALIZED;
+	static inline ObfuscateStatus thread_local __LAST_STATE = ObfuscateStatus::INITIALIZED;
 
 	__FORCE_INLINE_
 	void __SET_LAST_STATE(ObfuscateStatus status) noexcept
