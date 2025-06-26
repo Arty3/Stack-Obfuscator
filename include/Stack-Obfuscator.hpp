@@ -829,7 +829,7 @@ namespace __StackObfuscator
 
 	template <CallingConvention cc, typename RetType, typename Callable, typename... Args>
 	__NO_CFG_ __NO_STACK_PROTECT_
-	RetType ShellCodeManager(Calla__RETURN_ADDR_PTR_ble* f, Args&&... args) noexcept
+	RetType ShellCodeManager(Callable* f, Args&&... args) noexcept
 	{
 		OBFUSCATE_FUNCTION;
 
