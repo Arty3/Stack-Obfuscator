@@ -206,11 +206,11 @@ namespace __STACK_FRAGILE__
 		if (!checked)
 		{
 			if (!__STACK_FRAGILE__::__probably_has_frame_ptr(frame_ptr))
-				write(
+				static_cast<void>(write(
 					STDERR_FILENO,
 					"WARNING: Frame pointer appears invalid (-fno-omit-frame-pointer)\n",
 					65 * sizeof(char)
-				);
+				));
 			checked = 1;
 		}
 #endif
