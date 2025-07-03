@@ -102,6 +102,7 @@
 #define __FORCE_INLINE_		__attribute__((always_inline)) inline
 #define __NO_INLINE_		__attribute__((noinline))
 #define __NO_STACK_PROTECT_	__attribute__((no_stack_protector))
+#define __DEPRECATED_(x)	__attribute__((deprecated(x)))
 #if defined(__COMPILER_CLANG_) && __has_feature(cfi)
 #define __NO_CFG_			__attribute__((no_sanitize("cfi")))
 #elif (defined(__COMPILER_CLANG_) && __clang_major__ >= 7) \
@@ -162,6 +163,7 @@
 #elif defined(__COMPILER_CLANG_) || defined(__COMPILER_GCC_)
 namespace __STACK_FRAGILE__
 {
+	__DEPRECATED_("Unstable and brittle check")
 	static __FORCE_INLINE_
 	int __probably_has_frame_ptr(volatile void** __RESTRICT_ frame_ptr)
 	{
@@ -182,11 +184,12 @@ namespace __STACK_FRAGILE__
 			  (fp & (sizeof(void*) - 1)) == 0;
 	}
 
+	__DEPRECATED_("Compiler builtin is more reliable")
 	static __FORCE_INLINE_
 	void* __get_return_address_ptr(void)
 	{
-#pragma message("Remember to compile using `-fno-omit-frame-pointer` to ensure proper behavior.")
-#if defined(_DEBUG) || defined(__DEBUG) || defined(__DEBUG__) || defined(DEBUG) && !defined(NDEBUG)
+#if defined(_DEBUG) || defined(__DEBUG) || defined(__DEBUG__) \
+					|| defined(DEBUG) && !defined(NDEBUG)
 		static int checked = 0;
 #endif
 		volatile void** frame_ptr;
@@ -202,9 +205,11 @@ namespace __STACK_FRAGILE__
 		if (!frame_ptr) __UNLIKELY_
 			return nullptr;
 
-#if defined(_DEBUG) || defined(__DEBUG) || defined(__DEBUG__) || defined(DEBUG) && !defined(NDEBUG)
+#if defined(_DEBUG) || defined(__DEBUG) || defined(__DEBUG__) \
+					|| defined(DEBUG) && !defined(NDEBUG)
 		if (!checked)
 		{
+			/* -fno-omit-frame-pointer is no longer needed */
 			if (!__STACK_FRAGILE__::__probably_has_frame_ptr(frame_ptr))
 				static_cast<void>(write(
 					STDERR_FILENO,
@@ -214,14 +219,55 @@ namespace __STACK_FRAGILE__
 			checked = 1;
 		}
 #endif
-
 		/* Return address is at [rbp+8] on x64 */
+		return reinterpret_cast<void*>(const_cast<void**>(frame_ptr + 1));
+	}
+
+	static __FORCE_INLINE_
+	void* __get_return_address_ptr_new(void)
+	{
+		volatile void** frame_ptr = static_cast<volatile void**>(
+										__builtin_frame_address(0));
+
+		if (!frame_ptr) __UNLIKELY_
+			return nullptr;
+
+		/* Return address is at [rbp+8] on x64,
+		 * Not sure why the compiler builtin doesn't
+		 * account for this, but tests support this:
+		 * 
+		 * Testing return address pointer functions...
+		 * Main level:
+		 *   Original: 0x7fffc13868c8
+		 *   New:      0x7fffc13868c8
+		 *   Match:    YES
+		 *   Actual return addr: 0x6542453d0528
+		 *   Pointed-to addr:    0x6542453d0528
+		 *   Address valid:      YES
+		 * 
+		 * Level 1:
+		 *   Original: 0x7fffc13868b8
+		 *   New:      0x7fffc13868b8
+		 *   Match:    YES
+		 *   Actual return addr: 0x6542453d04dd
+		 *   Pointed-to addr:    0x6542453d04dd
+		 *   Address valid:      YES
+		 * 
+		 * Level 2:
+		 *   Original: 0x7fffc13868b8
+		 *   New:      0x7fffc13868b8
+		 *   Match:    YES
+		 *   Actual return addr: 0x6542453d04f2
+		 *   Pointed-to addr:    0x6542453d04f2
+		 *   Address valid:      YES
+		 * 
+		 * All tests passed! */
 		return reinterpret_cast<void*>(const_cast<void**>(frame_ptr + 1));
 	}
 }
 
-#define __RETURN_ADDR_PTR_()	\
-	__STACK_FRAGILE__::__get_return_address_ptr()
+#define __RETURN_ADDR_PTR_() \
+	__STACK_FRAGILE__::__get_return_address_ptr_new()
 
 #endif
 
