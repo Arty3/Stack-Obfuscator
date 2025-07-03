@@ -70,7 +70,6 @@
 
 #### 📋 Core Requirements
 - **C++20 or above** (required for all platforms)
-- **Frame pointer support** (`-fno-omit-frame-pointer` for GCC/Clang builds)
 
 #### 🖥️ Supported Compilers
 - **Microsoft Visual C++** (MSVC 2019 16.8+)
@@ -88,7 +87,6 @@
 - **ARM64** (AArch64, full feature support)
 
 #### ⚙️ Build Configuration Notes
-- **GCC/Clang**: Compile with `-fno-omit-frame-pointer` for reliable frame pointer access
 - **Vectorcall support**: Use Clang instead of GCC (GCC lacks vectorcall support)
 - **Kernel mode**: Requires Windows Driver Kit (WDK) and appropriate kernel headers
 - **CFI support**: Clang with `-fsanitize=cfi -flto` for enhanced control flow integrity
@@ -226,7 +224,6 @@ Enum type representing the internal library thread state (Kernel-mode only).
 #### 🌐 Cross-Platform Development
 - Use `OBFUSCATE_MICROSOFT_ABI` on Linux when calling Windows-compatible functions (Wine/CrossOver)
 - Use `OBFUSCATE_SYSV_ABI` for explicit Unix/Linux native calling convention adherence
-- Compile GCC/Clang builds with `-fno-omit-frame-pointer` for reliable frame pointer access
 - Use Clang instead of GCC when `vectorcall` support is required
 
 #### 🏗️ Architecture & Performance
@@ -280,7 +277,6 @@ Assume `OBFUSCATE_FUNCTION` is inserted/removed between examples:
 
 #### 🛡️ Security Considerations  
 - **Not foolproof** - No security solution ever is; this is one layer in a defense-in-depth strategy
-- **Frame pointer dependency** - GCC/Clang builds require `-fno-omit-frame-pointer` for reliable operation
 - **Compiler-specific features** - Some advanced features unavailable on older compiler versions
 - **Hardware entropy dependency** - Fallback mechanisms activate on systems without modern entropy sources
 
