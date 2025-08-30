@@ -6,63 +6,39 @@
 
 [Stack-Obfuscator.hpp](./include/Stack-Obfuscator.hpp) is a header-only C++ library for Windows (user & kernel mode) and Linux systems that helps protect critical functions in your program from reverse engineering, heuristic detection, static detection and much more. It works by temporarily encrypting function return addresses on the stack during execution making it significantly harder for all analysis tools to trace the execution flow of your program. Further, it also proxies external calls your program makes essentially masking any external behavior you might be doing. No system call or API call will point from or back to your program.
 
+> [!IMPORTANT]
+> This project is primarily intended for protection or learning purposes, while it can easily be used for maliscious reasons, its purpose is not that.
+>
+> Please consider using this library with other security solutions for more comprehensive protection.
+
 ## ✨ Features
 
 ### 🔒 Security & Protection
-- **Advanced stack obfuscation** with XOR encryption
-- **Return address protection** and verification
-- **Cryptographically secure key generation** using hardware entropy sources
-- **Anti-tampering detection** with immediate termination
-- **Cross-platform CFI/CFG controls** (Clang CFI, GCC CET, MSVC CFG)
-- **Entropy quality validation** with pattern detection
-- **Stack corruption detection** and prevention
+- **Stack obfuscation**
+- **Return address protection**
+- **Cryptographically secure key generation**
+- **Anti-tampering detection**
+- **Cross-platform CFI/CFG controls**
+- **Entropy quality validation**
+- **Stack corruption detection**
 
-### 🚀 Performance & Efficiency  
+### 🚀 Performance & Efficiency
 - **Zero allocation performance overhead**
-- **Aggressive compiler inlining** for minimal runtime cost
-- **Hardware-accelerated entropy** (RDTSC, performance counters)
-- **Compile-time optimization** through constexpr branching
-- **Cache-friendly memory layout** with proper alignment
-- **Minimal runtime exceptions** with comprehensive error handling
+- **Aggressive compiler inlining**
+- **Hardware-accelerated**
+- **Compile-time optimization**
 
-### 🌐 Cross-Platform Excellence
-- **Universal compiler support** (MSVC, GCC, Clang with auto-detection)
-- **Multi-architecture support** (x64, x86, ARM64)
-- **Platform-native optimizations** (Windows, Linux)
-- **ABI-aware calling conventions** (Microsoft ABI, System V ABI)
-- **Complete calling convention coverage** (cdecl, stdcall, fastcall, thiscall, vectorcall, ms_abi, sysv_abi)
-- **Graceful feature degradation** (e.g., GCC vectorcall handling)
-
-### 🧵 Threading & Concurrency
-- **Thread-safe design** with spinlock protection
-- **Thread-unique encryption keys** with per-thread entropy
-- **Kernel mode thread lifecycle management**
-- **TLS-based state management** with proper cleanup
-- **Race condition prevention** in critical sections
-
-### 🏗️ Architecture & Design
-- **Modern C++20 design** with template metaprogramming
-- **Header-only implementation** with zero external dependencies
-- **STL-free kernel mode** with custom implementations
-- **RAII-compliant** with automatic cleanup
-- **Clean abstraction layers** for maintainability
-- **Enterprise-grade error handling** with detailed status reporting
+### 🌐 Cross-Platform
+- **Cross compiler support: MSVC, GCC, Clang**
+- **Multi-architecture support: x64, x86, ARM64**
+- **Platform-native optimizations: Windows, Linux**
+- **ABI-aware calling conventions: Microsoft ABI, System V ABI**
+- **Complete calling convention coverage**
 
 ### 🔧 Advanced Features
-- **Kernel and user mode support** with unified API
-- **Windows kernel driver compatibility** with TLS slot management
-- **Frame pointer validation** with runtime detection
-- **Xoshiro256 PRNG implementation** for high-quality key generation
-- **Multiple entropy fallback strategies** for edge cases
-- **Comprehensive debug support** with frame pointer validation warnings
-
-### 📊 Quality & Reliability
-- **Production-ready stability** with extensive safety limits
-- **Defensive programming** with bounds checking and validation
-- **Cross-compiler compatibility** testing
-- **Memory safety guarantees** with proper alignment and bounds
-- **Professional documentation** with clear usage examples
-- **Expert-level systems programming** implementation
+- **Kernel and user mode support with unified API**
+- **Windows kernel driver compatibility**
+- **Xoshiro256 PRNG encryption**
 
 ## 🚀 Installation
 
@@ -77,9 +53,9 @@
 - **GCC** (9.0+)
 
 #### 🌐 Supported Platforms
-- **Windows 10 or above** (x64, x86, ARM64)
-- **Linux** (x64, x86, ARM64)
-- **Windows Kernel Mode** (driver development with WDK)
+- **Windows 10 or above**
+- **Linux**
+- **Windows Kernel Mode**
 
 #### 🏗️ Architecture Support
 - **x86-64** (primary target, full feature support)
@@ -268,31 +244,7 @@ Assume `OBFUSCATE_FUNCTION` is inserted/removed between examples:
 |------------------|----------------------|
 |![CallStack](./screenshots/NormalCallStack.png)|![CallStack](./screenshots/ObfuscatedCallStack.png)|
 
-## ⚠ Limitations
-
-#### 🔧 Platform & Language Support
-- **No C interface** (C++ only - C wrapper planned for future release)
-- **Limited platform support** - Windows and Linux only (no macOS, BSD, Android, or embedded systems)
-- **Architecture constraints** - x86 32-bit support is limited with warnings
-
-#### 🛡️ Security Considerations  
-- **Not foolproof** - No security solution ever is; this is one layer in a defense-in-depth strategy
-- **Compiler-specific features** - Some advanced features unavailable on older compiler versions
-- **Hardware entropy dependency** - Fallback mechanisms activate on systems without modern entropy sources
-
-#### 🚀 Performance & Compatibility
-- **GCC vectorcall limitation** - Use Clang for `vectorcall` support (GCC doesn't support this calling convention)
-- **Kernel mode complexity** - Requires careful TLS management and proper cleanup registration
-- **Debug overhead** - Frame pointer validation in debug builds adds minimal runtime cost
-- **Cross-compilation constraints** - ABI mixing between platforms requires careful consideration
-
-#### 🔄 Operational Limitations
-- **Single-threaded key generation** - Each thread gets unique keys but initial generation is sequential
-- **Memory protection scope** - Protects return addresses and call chains, not general memory corruption
-- **Static analysis evasion** - Effective against runtime attacks but not compile-time analysis
-- **Exception handling** - Minimal exception usage may limit integration with exception-heavy codebases
-
-## 🔧 Technical Design & Implementation Details
+## 🔧 Technical Design & Learning
 
 ### Foundation
 
