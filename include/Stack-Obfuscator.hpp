@@ -88,6 +88,11 @@
 #include <random>
 #endif
 
+/* To clarify, the weird naming convention: __SYMBOL_
+ * is to avoid polluting the global macro namespace,
+ * since when we include the header, we can't scope
+ * these macros away, so best to name them poorly */
+
 #if defined(__COMPILER_MSVC_)
 #define __FORCE_INLINE_		__forceinline
 #define __NO_INLINE_		__declspec(noinline)
@@ -216,7 +221,7 @@ namespace __STACK_FRAGILE__
 			checked = 1;
 		}
 #endif
-		/* Return address is at [rbp+8] on x64 */
+		/* Return address is at [rbp+8] on 64-bit and [edp+4] on 32-bit */
 		return reinterpret_cast<void*>(const_cast<void**>(frame_ptr + 1));
 	}
 
@@ -229,36 +234,47 @@ namespace __STACK_FRAGILE__
 		if (!frame_ptr) __UNLIKELY_
 			return nullptr;
 
-		/* Return address is at [rbp+8] on x64,
-		 * Not sure why the compiler builtin doesn't
-		 * account for this, but tests support this:
+		/* Works for both 64 and 32 bit architectures:
+		 * on 64-bit frame_ptr + 1 points to [rbp+8]
+		 * on 32-bit frame_ptr + 1 points to [edp+4]
+		 *
+		 * The function is portable across architectures,
+		 * adding 1 to frame_ptr results in 4 bytes
+		 * on a 32-bit architecture, while on 64-bit
+		 * adding 1 results in an 8 byte offset.
+		 *
+		 * Compiler builtin don't seem to really
+		 * reproduce correct behavior, not sure
+		 * why, maybe undefined behavior, but
+		 * tests support this behavior:
 		 * 
 		 * Testing return address pointer functions...
 		 * Main level:
-		 *   Original: 0x7fffc13868c8
-		 *   New:      0x7fffc13868c8
-		 *   Match:    YES
+		 *   Original:           0x7fffc13868c8
+		 *   New:                0x7fffc13868c8
+		 *   Match:              YES
 		 *   Actual return addr: 0x6542453d0528
 		 *   Pointed-to addr:    0x6542453d0528
 		 *   Address valid:      YES
 		 * 
 		 * Level 1:
-		 *   Original: 0x7fffc13868b8
-		 *   New:      0x7fffc13868b8
-		 *   Match:    YES
+		 *   Original:           0x7fffc13868b8
+		 *   New:                0x7fffc13868b8
+		 *   Match:              YES
 		 *   Actual return addr: 0x6542453d04dd
 		 *   Pointed-to addr:    0x6542453d04dd
 		 *   Address valid:      YES
 		 * 
 		 * Level 2:
-		 *   Original: 0x7fffc13868b8
-		 *   New:      0x7fffc13868b8
-		 *   Match:    YES
+		 *   Original:           0x7fffc13868b8
+		 *   New:                0x7fffc13868b8
+		 *   Match:              YES
 		 *   Actual return addr: 0x6542453d04f2
 		 *   Pointed-to addr:    0x6542453d04f2
 		 *   Address valid:      YES
 		 * 
 		 * All tests passed! */
+
 		return reinterpret_cast<void*>(const_cast<void**>(frame_ptr + 1));
 	}
 }
