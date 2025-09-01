@@ -10,9 +10,6 @@
 		- Windows 10 or above, alternatively Linux
 
 	- Notes:
-		- For GCC / Clang builds, please ensure
-		  compilation with `-fno-omit-frame-pointer`
-
 		- GCC does not support vector calls for
 		  some ungodly reason, so use clang instead
 */
@@ -165,7 +162,7 @@ namespace __STACK_FRAGILE__
 {
 	__DEPRECATED_("Unstable and brittle check")
 	static __FORCE_INLINE_
-	int __probably_has_frame_ptr(volatile void** __RESTRICT_ frame_ptr)
+	int __probably_has_frame_ptr(volatile void** frame_ptr)
 	{
 		const uintptr_t fp = (const uintptr_t)frame_ptr;
 		volatile uintptr_t sp;
@@ -210,7 +207,7 @@ namespace __STACK_FRAGILE__
 		if (!checked)
 		{
 			/* -fno-omit-frame-pointer is no longer needed */
-			if (!__STACK_FRAGILE__::__probably_has_frame_ptr(frame_ptr))
+			if (!__STACK_FRAGILE__::__probably_has_frame_ptr(frame_ptr)) __UNLIKELY_
 				static_cast<void>(write(
 					STDERR_FILENO,
 					"WARNING: Frame pointer appears invalid (-fno-omit-frame-pointer)\n",
@@ -431,12 +428,12 @@ namespace __StackObfuscator
 	__FORCE_INLINE_
 	ThreadState* getThreadState(void) noexcept
 	{
-		if (!__ALLOW_TLS_OVERWRITE)
+		if (!__ALLOW_TLS_OVERWRITE) __UNLIKELY_
 			return nullptr;
 
 		PVOID teb = PsGetCurrentThreadTeb();
 
-		if (!teb)
+		if (!teb) __UNLIKELY_
 			return nullptr;
 
 		const PVOID tls_location = (PVOID)(
@@ -449,9 +446,9 @@ namespace __StackObfuscator
 	__FORCE_INLINE_
 	void __SET_LAST_STATE(ObfuscateStatus status) noexcept
 	{
-		ThreadState* __RESTRICT_ state = getThreadState();
+		ThreadState* state = getThreadState();
 
-		if (!state)
+		if (!state) __UNLIKELY_
 			return;
 
 		state->last_state = status;
@@ -460,9 +457,9 @@ namespace __StackObfuscator
 	__FORCE_INLINE_
 	ObfuscateStatus __GET_LAST_STATE(void) noexcept
 	{
-		ThreadState* __RESTRICT_ state = getThreadState();
+		ThreadState* state = getThreadState();
 
-		if (!state)
+		if (!state) __UNLIKELY_
 			return ObfuscateStatus::UNINITIALIZED_TLS;
 
 		return state->last_state;
@@ -578,7 +575,7 @@ namespace __StackObfuscator
 
 			__MEMORY_BARRIER_();
 			
-			if (!__verify_entropy_quality(state->current_key))
+			if (!__verify_entropy_quality(state->current_key)) __UNLIKELY_
 			{
 				state->current_key = next(state) ^ __rdtsc() ^ (UINT64)state;
 				__SET_LAST_STATE(ObfuscateStatus::WEAK_ENCRYPTION_FALLBACK);
@@ -595,7 +592,7 @@ namespace __StackObfuscator
 		static __FORCE_INLINE_
 		void initThreadLocal(void) noexcept
 		{
-			if (initialized)
+			if (initialized) __UNLIKELY_
 				return;
 
 			std::random_device rd;
@@ -607,7 +604,7 @@ namespace __StackObfuscator
 		static __FORCE_INLINE_
 		bool __verify_entropy_quality(UINT64 key) noexcept
 		{
-			if (!key)
+			if (!key) __UNLIKELY_
 				return false;
 
 			UINT8 first_byte = (UINT8)(key & 0xFF);
@@ -621,7 +618,7 @@ namespace __StackObfuscator
 				}
 			}
 
-			if (all_same)
+			if (all_same) __UNLIKELY_
 				return false;
 
 #if defined(__COMPILER_MSVC_)
@@ -638,10 +635,10 @@ namespace __StackObfuscator
 			uint32_t upper = (uint32_t)(key >> 32);
 			uint32_t lower = (uint32_t)(key & 0xFFFFFFFF);
 			
-			if (upper == lower)
+			if (upper == lower) __UNLIKELY_
 				return false;
 
-			if (upper == lower + 1 || upper == lower - 1)
+			if (upper == lower + 1 || upper == lower - 1) __UNLIKELY_
 				return false;
 				
 			__SET_LAST_STATE(ObfuscateStatus::WEAK_ENCRYPTION_FALLBACK);
@@ -655,7 +652,7 @@ namespace __StackObfuscator
 		static __FORCE_INLINE_
 		void initThreadStateKey(ThreadState* __RESTRICT_ state) noexcept
 		{
-			if (state->initialized)
+			if (state->initialized) __UNLIKELY_
 				return;
 
 			LARGE_INTEGER time;
@@ -680,9 +677,9 @@ namespace __StackObfuscator
 		static __FORCE_INLINE_
 		UINT64 getKey(void) noexcept
 		{
-			ThreadState* __RESTRICT_ state = getThreadState();
+			ThreadState* state = getThreadState();
 
-			if (!state)
+			if (!state) __UNLIKELY_
 				return 0;
 
 			return state->current_key;
@@ -724,16 +721,16 @@ namespace __StackObfuscator
 	__FORCE_INLINE_
 	void initThreadState(void) noexcept
 	{
-		if (!__ALLOW_TLS_OVERWRITE)
+		if (!__ALLOW_TLS_OVERWRITE) __UNLIKELY_
 			return;
 
-		ThreadState* __RESTRICT_ state = getThreadState();
+		ThreadState* state = getThreadState();
 
 		KIRQL oldIrql;
 
 		KeAcquireSpinLock(&__LAST_THREAD_STATE_LOCK, &oldIrql);
 
-		if (!state)
+		if (!state) __UNLIKELY_
 		{
 			__LAST_THREAD_STATE = LastThreadStatus::INIT_FAILURE;
 			KeReleaseSpinLock(&__LAST_THREAD_STATE_LOCK, oldIrql);
@@ -889,7 +886,7 @@ namespace __StackObfuscator
 			return RetType();
 		}
 
-		void* __RESTRICT_ ret_addr = __RETURN_ADDR_PTR_();
+		void* ret_addr = __RETURN_ADDR_PTR_();
 		__MEMORY_BARRIER_();
 		uintptr_t tmp = *(uintptr_t*)ret_addr ^ xor_key;
 		__MEMORY_BARRIER_();
@@ -1144,8 +1141,10 @@ namespace __StackObfuscator
 			if (!f) __UNLIKELY_
 			{
 				__SET_LAST_STATE(ObfuscateStatus::INVALID_FUNCTION_ADDRESS);
+
 				if constexpr (detail::is_same<RetType, void>)
 					return;
+
 				return RetType();
 			}
 
