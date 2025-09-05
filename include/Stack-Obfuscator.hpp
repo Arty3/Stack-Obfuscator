@@ -855,10 +855,12 @@ namespace __StackObfuscator
 
 	template <typename Fn, typename Tp, std::size_t... I, typename... A>
 	__FORCE_INLINE_
-	auto __invoke_declared(Fn fn, std::index_sequence<I...>, A&&... a)
+	auto __invoke_declared(Fn&& fn, std::index_sequence<I...>, A&&... a)
+		noexcept(noexcept(std::forward<Fn>(fn)(static_cast<std::tuple_element_t<I, Tp>>(detail::forward<A>(a))...)))
 		-> decltype(fn(static_cast<std::tuple_element_t<I, Tp>>(detail::forward<A>(a))...))
 	{
-		return fn(static_cast<std::tuple_element_t<I, Tp>>(detail::forward<A>(a))...);
+		static_assert(std::tuple_size_v<Tp> == sizeof...(I), "Index pack must match tuple arity");
+		return detail::forward<Fn>(fn)(static_cast<std::tuple_element_t<I, Tp>>(detail::forward<A>(a))...);
 	}
 
 #else
@@ -872,7 +874,7 @@ struct __km_sig<R(P...)>
 
 	template <typename Fn, typename... A>
 	static __FORCE_INLINE_
-	R invoke(Fn fn, A&&... a)
+	R invoke(Fn fn, A&&... a) noexcept
 	{
 		return fn(static_cast<P>(detail::forward<A>(a))...);
 	}
@@ -884,26 +886,26 @@ template <typename R, typename... P>
 struct __km_rebind<CallingConvention::__CDECL, R(P...)>
 {
 	using type = R(__CDECL__*)(P...);
-}
+};
 
 template <typename R, typename... P>
 struct __km_rebind<CallingConvention::__STDCALL, R(P...)>
 {
 	using type = R(__STDCALL__*)(P...);
-}
+};
 
 template <typename R, typename... P>
 struct __km_rebind<CallingConvention::__THISCALL, R(P...)>
 {
 	using type = R(__THISCALL__*)(P...);
-}
+};
 
 #if !defined(_MANAGED)
 template <typename R, typename... P>
 struct __km_rebind<CallingConvention::__VECTORCALL, R(P...)>
 {
 	using type = R(__VECTORCALL__*)(P...);
-}
+};
 #endif
 
 #if defined(__ARCH_X86_)
@@ -911,7 +913,7 @@ template <typename R, typename... P>
 struct __km_rebind<CallingConvention::__FASTCALL, R(P...)>
 {
 	using type = R(__FASTCALL__*)(P...);
-}
+};
 #endif
 
 #endif
