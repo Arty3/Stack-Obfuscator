@@ -20,17 +20,17 @@
 #define __COMPILER_MSVC_
 #elif defined(__clang__) && defined(__GNUC__)
 #define __COMPILER_CLANG_
+#pragma clang diagnostic ignored "-Wignored-attributes"
 #elif defined(__GNUC__) && defined(__GNUC_PATCHLEVEL__)
 #define __COMPILER_GCC_
+#pragma GCC diagnostic ignored "-Wattributes"
+#pragma GCC diagnostic ignored "-Wignored-attributes"
 #else
 #error "Unsupported compiler. This translation unit requires MSVC, Clang or GCC."
 #endif
 
 #if defined(_WIN32) || defined(_WIN64)
 #define __PLATFORM_WINDOWS_
-#if NTDDI_VERSION < NTDDI_WIN10_VB
-#error "This translation unit requires Windows 10 or above."
-#endif
 #elif defined(__linux__)
 #define __PLATFORM_LINUX_
 #else
@@ -39,6 +39,18 @@
 
 #if defined(__PLATFORM_WINDOWS_) && defined(_KERNEL_MODE)
 #define __WINDOWS_KERNEL_
+#if !defined(__COMPILER_MSVC_)
+#error "Windows kernel mode is only supported by MSVC."
+#endif
+#endif
+
+#if defined(__COMPILER_CLANG_) || defined(__COMPILER_GCC_)
+#if !defined(__has_builtin)
+#define __has_builtin(x) 0
+#endif
+#if !defined(__has_feature)
+#define __has_feature(x) 0
+#endif
 #endif
 
 #if defined(__PLATFORM_WINDOWS_)
@@ -46,7 +58,11 @@
 #define __ARCH_X64_
 #elif defined(_M_IX86)
 #define __ARCH_X86_
+#if defined(__COMPILER_MSVC_)
+#pragma message("warning: 32-bit architecture lacks support.")
+#else
 #warning "32-bit architecture lacks support."
+#endif
 #elif defined(_M_ARM64)
 #define __ARCH_ARM64_
 #endif
@@ -55,7 +71,11 @@
 #define __ARCH_X64_
 #elif defined(__i386__)
 #define __ARCH_X86_
+#if defined(__COMPILER_MSVC_)
+#pragma message("warning: 32-bit architecture lacks support.")
+#else
 #warning "32-bit architecture lacks support."
+#endif
 #elif defined(__aarch64__)
 #define __ARCH_ARM64_
 #endif
@@ -64,7 +84,7 @@
 #endif
 
 #if defined(__COMPILER_MSVC_)
-#if !_HAS_CXX20 && defined(_MSVC_LANG) && _MSVC_LANG < 202002L
+#if defined(_MSVC_LANG) && _MSVC_LANG < 202002L
 #error "This translation unit requires C++20 or above."
 #endif
 #elif defined(__COMPILER_CLANG_) || defined(__COMPILER_GCC_)
@@ -79,13 +99,40 @@
 #elif defined(__PLATFORM_WINDOWS_)
 #include <Windows.h>
 #include <Intrin.h>
-#include <emmintrin.h>
 #include <random>
+#include <tuple>
+#if NTDDI_VERSION < NTDDI_WIN10_VB
+#error "This translation unit requires Windows 10 or above."
+#endif
 #elif defined(__PLATFORM_LINUX_)
 #include <signal.h>
 #include <unistd.h>
 #include <cstdint>
 #include <random>
+#include <tuple>
+#endif
+
+#if !defined(OBFUSCATOR_ENABLE_RA_TAMPER)
+#define OBFUSCATOR_ENABLE_RA_TAMPER 1
+#endif
+
+/* AArch64: default to NO tamper unless explicitly forced */
+#if defined(__ARCH_ARM64_)
+#if !defined(OBFUSCATOR_ARM64_FORCE_TAMPER)
+#define OBFUSCATOR_ARM64_FORCE_TAMPER 0
+#endif
+#else
+#define OBFUSCATOR_ARM64_FORCE_TAMPER 1
+#endif
+
+#if defined(__ARCH_ARM64_) && defined(__COMPILER_CLANG_)
+#if __has_feature(shadow_call_stack)
+#define __NO_SCS_	__attribute__((no_sanitize("shadow-call-stack")))
+#else
+#define __NO_SCS_
+#endif
+#else
+#define __NO_SCS_
 #endif
 
 /* To clarify, the weird naming convention: __SYMBOL_
@@ -100,12 +147,13 @@
 #define __NO_CFG_			__declspec(guard(nocf))
 #define __ALIGN_(x)			__declspec(align(x))
 #define __RESTRICT_			__restrict
+#define __DISCARD_BRANCH_	__assume(0)
 #elif defined(__COMPILER_GCC_) || defined(__COMPILER_CLANG_)
 #define __FORCE_INLINE_		__attribute__((always_inline)) inline
 #define __NO_INLINE_		__attribute__((noinline))
 #define __NO_STACK_PROTECT_	__attribute__((no_stack_protector))
 #define __DEPRECATED_(x)	__attribute__((deprecated(x)))
-#if defined(__COMPILER_CLANG_) && __has_feature(cfi)
+#if defined(__COMPILER_CLANG_) && defined(__has_feature) && __has_feature(cfi)
 #define __NO_CFG_			__attribute__((no_sanitize("cfi")))
 #elif (defined(__COMPILER_CLANG_) && __clang_major__ >= 7) \
 	|| (defined(__COMPILER_GCC_) && __GNUC__ >= 9)
@@ -115,18 +163,23 @@
 #endif
 #define __ALIGN_(x)			__attribute__((aligned(x)))
 #define __RESTRICT_			__restrict__
+#define __DISCARD_BRANCH_	__builtin_unreachable()
 #endif
 
 #if !defined(__WINDOWS_KERNEL_)
-#define __UNLIKELY_	[[unlikely]]
+#define __UNLIKELY_		[[unlikely]]
+#define __LIKELY_		[[likely]]
+#define __MAYBE_UNUSED_	[[maybe_unused]]
 #else
 #define __UNLIKELY_
+#define __LIKELY_
+#define __MAYBE_UNUSED_
 #endif
 
-#if defined(__PLATFORM_WINDOWS_) && defined(__COMPILER_MSVC_)
-#define __MEMORY_BARRIER_()	_mm_mfence()
-#elif defined(__WINDOWS_KERNEL_)
+#if defined(__WINDOWS_KERNEL_)
 #define __MEMORY_BARRIER_()	KeMemoryBarrier()
+#elif defined(__PLATFORM_WINDOWS_) && defined(__COMPILER_MSVC_)
+#define __MEMORY_BARRIER_()	do { _ReadWriteBarrier(); _mm_mfence(); _ReadWriteBarrier(); } while (0)
 #elif defined(__ARCH_ARM64_) && defined(__COMPILER_MSVC_)
 #define __MEMORY_BARRIER_()	__dmb(_ARM64_BARRIER_SY)
 #elif defined(__ARCH_ARM64_) && (defined(__COMPILER_GCC_) || defined(__COMPILER_CLANG_))
@@ -146,19 +199,76 @@
 #define __FASTCALL__	__fastcall
 #define __THISCALL__	__thiscall
 #else
-#define __CDECL__		__attribute__((cdecl))
-#define __STDCALL__		__attribute__((stdcall))
 #if defined(__COMPILER_CLANG_)
 #define __VECTORCALL__	__attribute__((vectorcall))
 #else
 /* GCC doesnt support vector calls */
 #define __VECTORCALL__
 #endif
+#if defined(__COMPILER_GCC_) && !defined(__ARCH_X86_)
+#define __CDECL__
+#define __STDCALL__
+#define __FASTCALL__
+#define __THISCALL__
+#else
+#define __CDECL__		__attribute__((cdecl))
+#define __STDCALL__		__attribute__((stdcall))
 #define __FASTCALL__	__attribute__((fastcall))
 #define __THISCALL__	__attribute__((thiscall))
+#endif
 #define __MS_ABI__		__attribute__((ms_abi))
 #define __SYSV_ABI__	__attribute__((sysv_abi))
 #endif
+
+namespace __RA
+{
+static __FORCE_INLINE_
+bool __ra_tamper_allowed_cached(void) noexcept
+{
+#if !OBFUSCATOR_ENABLE_RA_TAMPER
+	return false;
+#endif
+#if defined(__ARCH_ARM64_) && !OBFUSCATOR_ARM64_FORCE_TAMPER
+	return false;
+#endif
+#if defined(__PLATFORM_WINDOWS_) && !defined(__WINDOWS_KERNEL_)
+	using getpol_fn = BOOL (__STDCALL__*)(HANDLE, PROCESS_MITIGATION_POLICY, PVOID, SIZE_T);
+
+	static int cached = -1;
+	if (cached >= 0) __LIKELY_
+		return cached != 0;
+
+	HMODULE k32 = GetModuleHandleW(L"kernel32.dll");
+
+	PROCESS_MITIGATION_USER_SHADOW_STACK_POLICY pol{};
+	getpol_fn getpol;
+
+	if (!k32) __UNLIKELY_
+		goto __RA_FAIL;
+
+	getpol = reinterpret_cast<getpol_fn>(
+		GetProcAddress(k32, "GetProcessMitigationPolicy")
+	);
+
+	if (!getpol) __UNLIKELY_
+		goto __RA_FAIL;
+
+	if (!getpol(GetCurrentProcess(),
+		ProcessUserShadowStackPolicy,
+		&pol, sizeof(pol))) __UNLIKELY_
+		goto __RA_FAIL;
+
+	cached = pol.EnableUserShadowStack ? 0 : 1;
+	return cached != 0;
+
+__RA_FAIL:
+	cached = 0;
+	return false;
+#else
+	return true;
+#endif
+}
+}
 
 #if defined(__COMPILER_MSVC_)
 #define __RETURN_ADDR_PTR_()	_AddressOfReturnAddress()
@@ -169,7 +279,7 @@ namespace __STACK_FRAGILE__
 	static __FORCE_INLINE_
 	int __probably_has_frame_ptr(volatile void** frame_ptr)
 	{
-		const uintptr_t fp = (const uintptr_t)frame_ptr;
+		const uintptr_t fp = reinterpret_cast<uintptr_t>(frame_ptr);
 		volatile uintptr_t sp;
 
 #if defined(__ARCH_X64_)
@@ -212,6 +322,7 @@ namespace __STACK_FRAGILE__
 		if (!checked)
 		{
 			/* -fno-omit-frame-pointer is no longer needed */
+#if defined(__PLATFORM_LINUX_)
 			if (!__STACK_FRAGILE__::__probably_has_frame_ptr(frame_ptr)) __UNLIKELY_
 				static_cast<void>(write(
 					STDERR_FILENO,
@@ -219,6 +330,7 @@ namespace __STACK_FRAGILE__
 					65 * sizeof(char)
 				));
 			checked = 1;
+#endif
 		}
 #endif
 		/* Return address is at [rbp+8] on 64-bit and [edp+4] on 32-bit */
@@ -242,6 +354,7 @@ namespace __STACK_FRAGILE__
 		 * adding 1 to frame_ptr results in 4 bytes
 		 * on a 32-bit architecture, while on 64-bit
 		 * adding 1 results in an 8 byte offset.
+		 * This is because `+ 1` is `+ sizeof(void*)`
 		 *
 		 * Compiler builtin don't seem to really
 		 * reproduce correct behavior, not sure
@@ -273,7 +386,27 @@ namespace __STACK_FRAGILE__
 		 *   Pointed-to addr:    0x6542453d04f2
 		 *   Address valid:      YES
 		 * 
-		 * All tests passed! */
+		 * All tests passed!
+		 *
+		 * Important note:
+		 * This behavior is not guaranteed when
+		 * FPO/omit-frame-pointer is enabled,
+		 * tail calls occur, or on AArch64 with
+		 * aggressive prologues.
+		 *
+		 * Still, even with an omitted frame pointer
+		 * it seems to work fine and consistently,
+		 * the tests above were run without it.
+		 *
+		 * However, on AArch64 the link register (x30)
+		 * might not be spilled on the stack at all
+		 * for simple functions, even with a frame pointer.
+		 * We still assume it's at [x29+8], but it might be
+		 * incorrect. Since this pointer is being written
+		 * to, special attention is required for this case.
+		 *
+		 * Ideally compile with:
+		 *   -fno-omit-frame-pointer -fno-optimize-sibling-calls */
 
 		return reinterpret_cast<void*>(const_cast<void**>(frame_ptr + 1));
 	}
@@ -319,9 +452,11 @@ enum class ObfuscateStatus : UINT8
 	SUCCEEDED,
 	INITIALIZED,
 	PENDING_CALL,
+	INITIALIZED_TLS,
 	UNINITIALIZED_TLS,
 	INVALID_ENCRYPTION,
 	INVALID_FUNCTION_ADDRESS,
+	RA_TAMPER_NOT_ALLOWED,
 	WEAK_ENCRYPTION_FALLBACK,
 	CORRUPT_KEY_OR_STACK_ADDR,
 	INVALID_CALLING_CONVENTION,
@@ -338,22 +473,6 @@ enum class LastThreadStatus : UINT8
 	THREAD_IS_TERMINATING,
 	UNINITIALIZED_GLOBAL
 };
-
-#pragma intrinsic(__readgsqword)
-
-/* https://www.geoffchappell.com/studies/windows/km/ntoskrnl/inc/api/pebteb/teb/index.htm */
-#if defined(__ARCH_X64_)
-#define __TLS_SLOTS_OFFSET		0x1480
-#else
-#define __TLS_SLOTS_OFFSET		0x0E10
-#endif
-/* Defined as `PVOID TlsSlots[0x40];` */
-#define __TLS_SLOTS_SIZE		(0x40 * sizeof(PVOID))
-/* Starting at slot 0x290 */
-#define __TLS_SLOT_START_INDEX	(0x1480 / sizeof(PVOID))
-/* Using slots 0x290-0x297 */
-#define __TLS_SLOTS_USED		8
-
 #endif
 
 /* See the API section in README.md */
@@ -393,12 +512,18 @@ enum class LastThreadStatus : UINT8
 #define OBFUSCATE_LINUX_ABI(ret, name)		OBFUSCATE_CALL(ret, CallingConvention::__SYSV_ABI,		name)
 #endif
 
+#define __KEY_USES_ROTATION_DEFAULT 32
+
+#if !defined(__WINDOWS_KERNEL_)
+/* Number of obfuscation uses before key rotation (consider performance when adjusting) */
+#define OBFUSCATOR_KEY_USES_BEFORE_ROTATION __StackObfuscator::detail::key_uses_before_rotation
+#endif
+
 #if defined(__WINDOWS_KERNEL_)
-#define REGISTER_OBFUSCATOR_THREAD_CLEANUP		__StackObfuscator::detail::__RegisterThreadCleanup()
-#define UNREGISTER_OBFUSCATOR_THREAD_CLEANUP	__StackObfuscator::detail::__UnregisterThreadCleanup()
-#define ALLOW_TLS_OVERWRITE						__StackObfuscator::detail::__ALLOW_TLS_OVERWRITE
-#define LAST_THREAD_STATE						__StackObfuscator::detail::__LAST_THREAD_STATE
-#define OBFUSCATOR_TLS_OFFSET					sizeof(__StackObfuscator::detail::ThreadState)
+/* These need to be called very early: Ideally DriverEntry() */
+#define REGISTER_OBFUSCATOR_THREAD_RESOURCE_MANAGEMENT		__StackObfuscator::detail::__RegisterThreadCleanup()
+#define UNREGISTER_OBFUSCATOR_THREAD_RESOURCE_MANAGEMENT	__StackObfuscator::detail::__UnregisterThreadCleanup()
+#define LAST_THREAD_STATE									__StackObfuscator::detail::__LAST_THREAD_STATE
 #endif
 
 /* Avoid using the implementation directly */
@@ -407,6 +532,7 @@ namespace __StackObfuscator
 	inline namespace detail
 	{
 #if !defined(__WINDOWS_KERNEL_)
+	static inline int thread_local key_uses_before_rotation = __KEY_USES_ROTATION_DEFAULT;
 	static inline ObfuscateStatus thread_local __LAST_STATE = ObfuscateStatus::INITIALIZED;
 
 	__FORCE_INLINE_
@@ -423,9 +549,7 @@ namespace __StackObfuscator
 #else
 	typedef UINT64 uintptr_t;
 
-	LastThreadStatus	__LAST_THREAD_STATE		= LastThreadStatus::UNINITIALIZED_GLOBAL;
-	BOOLEAN				__ALLOW_TLS_OVERWRITE	= TRUE;
-	KSPIN_LOCK			__LAST_THREAD_STATE_LOCK;
+	LastThreadStatus __LAST_THREAD_STATE = LastThreadStatus::UNINITIALIZED_GLOBAL;
 
 	/* Important kernel mode memory alignment */
 	struct DECLSPEC_ALIGN(64) ThreadState
@@ -434,29 +558,168 @@ namespace __StackObfuscator
 		UINT64				current_key;	/* Thread local key		*/
 		BOOLEAN				initialized;	/* Thread init state	*/
 		::ObfuscateStatus	last_state;		/* Last internal state	*/
+		UINT32				max_key_uses;	/* Maximum key uses     */
+		UINT32				key_uses;		/* Encryption key uses  */
 	};
 
-	static_assert(
-		sizeof(ThreadState) <= __TLS_SLOTS_SIZE,
-		"Structure must fit within TLS allocation"
-	);
+	namespace __ThreadLocal
+	{
+
+	constexpr const ULONG TLS_BUCKETS = 64;
+
+	struct StateNode
+	{
+		PKTHREAD	thread;
+		ThreadState	state;
+		StateNode*	next;
+	};
+
+	struct alignas(64) Bucket
+	{
+		KSPIN_LOCK	lock;
+		StateNode*	head;
+	};
+
+	static Bucket			g_tlsBuckets[TLS_BUCKETS];
+	static volatile LONG	g_tlsBucketsInit = 0;
+
+	__FORCE_INLINE_
+	ULONG ptr_hash(PVOID p) noexcept
+	{
+		const UINT64 x = (UINT64)(ULONG_PTR)p;
+		UINT64 h = x ^ (x >> 33);
+		h *= 0xff51afd7ed558ccdULL;
+		h ^= h >> 33;
+		return (ULONG)(h & (TLS_BUCKETS - 1));
+	}
+
+	__FORCE_INLINE_
+	void __InitKernelTlsBuckets(void) noexcept
+	{
+		for (ULONG i = 0; i < TLS_BUCKETS; ++i)
+		{
+			KeInitializeSpinLock(&g_tlsBuckets[i].lock);
+			g_tlsBuckets[i].head = nullptr;
+		}
+	}
+
+	__FORCE_INLINE_
+	void __FreeThreadState(PKTHREAD th) noexcept
+	{
+		auto& b = g_tlsBuckets[ptr_hash(th)];
+
+		KIRQL oldIrql;
+		KeAcquireSpinLock(&b.lock, &oldIrql);
+
+		StateNode** prev	= &b.head;
+		StateNode*  victim	= nullptr;
+
+		for (StateNode* n = b.head; n; n = n->next)
+		{
+			if (n->thread == th)
+			{
+				*prev  = n->next;
+				victim = n;
+				break;
+			}
+			prev = &n->next;
+		}
+
+		KeReleaseSpinLock(&b.lock, oldIrql);
+
+		if (victim) __LIKELY_
+		{
+			RtlSecureZeroMemory(&victim->state, sizeof(victim->state));
+			ExFreePoolWithTag(victim, 'SfBO');
+		}
+	}
+
+	__FORCE_INLINE_
+	void __PurgeAllThreadStates(void) noexcept
+	{
+		for (ULONG i = 0; i < TLS_BUCKETS; ++i)
+		{
+			auto& b = g_tlsBuckets[i];
+
+			KIRQL oldIrql;
+			KeAcquireSpinLock(&b.lock, &oldIrql);
+
+			StateNode* list	= b.head;
+			b.head			= nullptr;
+
+			KeReleaseSpinLock(&b.lock, oldIrql);
+
+			while (list)
+			{
+				StateNode* next = list->next;
+
+				RtlSecureZeroMemory(&list->state, sizeof(list->state));
+				ExFreePoolWithTag(list, 'SfBO');
+
+				list = next;
+			}
+		}
+	}
+	}
 
 	__FORCE_INLINE_
 	ThreadState* getThreadState(void) noexcept
 	{
-		if (!__ALLOW_TLS_OVERWRITE) __UNLIKELY_
-			return nullptr;
+		if (!__ThreadLocal::g_tlsBucketsInit) __UNLIKELY_
+			if (!InterlockedCompareExchange(&__ThreadLocal::g_tlsBucketsInit, 1, 0)) __LIKELY_
+				__ThreadLocal::__InitKernelTlsBuckets();
 
-		PVOID teb = PsGetCurrentThreadTeb();
+		PKTHREAD th	= KeGetCurrentThread();
+		auto& b		= __ThreadLocal::g_tlsBuckets[__ThreadLocal::ptr_hash(th)];
 
-		if (!teb) __UNLIKELY_
-			return nullptr;
+		KIRQL oldIrql;
+		KeAcquireSpinLock(&b.lock, &oldIrql);
 
-		const PVOID tls_location = (PVOID)(
-			(ULONG_PTR)teb + __TLS_SLOTS_OFFSET
+		for (__ThreadLocal::StateNode* n = b.head; n; n = n->next)
+		{
+			if (n->thread == th)
+			{
+				KeReleaseSpinLock(&b.lock, oldIrql);
+				return &n->state;
+			}
+		}
+
+		KeReleaseSpinLock(&b.lock, oldIrql);
+
+		__ThreadLocal::StateNode* fresh = (__ThreadLocal::StateNode*)ExAllocatePoolZero(
+			NonPagedPoolNx, sizeof(__ThreadLocal::StateNode), 'SfBO'
 		);
 
-		return (ThreadState*)tls_location;
+		if (!fresh) __UNLIKELY_
+			return nullptr;
+
+		fresh->thread				= th;
+		fresh->state.initialized	= FALSE;
+		fresh->state.key_uses		= 0;
+		fresh->state.max_key_uses	= __KEY_USES_ROTATION_DEFAULT;
+		fresh->state.last_state		= ObfuscateStatus::INITIALIZED_TLS;
+
+		KeyGenerator::initThreadStateKey(&fresh->state);
+		fresh->state.initialized	= TRUE;
+
+		KeAcquireSpinLock(&b.lock, &oldIrql);
+		for (__ThreadLocal::StateNode* n = b.head; n; n = n->next)
+		{
+			if (n->thread == th)
+			{
+				ThreadState* s = &n->state;
+				KeReleaseSpinLock(&b.lock, oldIrql);
+				RtlSecureZeroMemory(&fresh->state, sizeof(fresh->state));
+				ExFreePoolWithTag(fresh, 'SfBO');
+				return s;
+			}
+		}
+
+		fresh->next	= b.head;
+		b.head		= fresh;
+
+		KeReleaseSpinLock(&b.lock, oldIrql);
+		return &fresh->state;
 	}
 
 	__FORCE_INLINE_
@@ -529,6 +792,129 @@ namespace __StackObfuscator
 
 	template <typename T>
 	static constexpr bool is_same<T, T> = true;
+
+#if !defined(__WINDOWS_KERNEL_)
+
+	template <typename> struct __fn_sig;
+	template <typename R, typename... P>
+	struct __fn_sig<R(P...)>
+	{
+		using ret	 = R;
+		using params = std::tuple<P...>;
+	};
+
+	template <typename Tp>
+	using __tuple_index_seq = std::make_index_sequence<std::tuple_size_v<Tp>>;
+
+#if defined(__COMPILER_MSVC_)
+	template <typename R, typename... P> using __cdecl_ptr_t		= R(__CDECL__		*)(P...);
+	template <typename R, typename... P> using __stdcall_ptr_t		= R(__STDCALL__		*)(P...);
+	template <typename R, typename... P> using __vectorcall_ptr_t	= R(__VECTORCALL__	*)(P...);
+	template <typename R, typename... P> using __fastcall_ptr_t		= R(__FASTCALL__	*)(P...);
+	template <typename R, typename... P> using __thiscall_ptr_t		= R(__THISCALL__	*)(P...);
+
+	template <CallingConvention CC, typename R, typename Tp> struct __rebind_fnptr;
+
+	template <typename R, typename... P>
+	struct __rebind_fnptr<CallingConvention::__CDECL, R, std::tuple<P...>>
+	{
+		using type = __cdecl_ptr_t<R, P...>;
+	};
+
+#if defined(__PLATFORM_WINDOWS_)
+	template <typename R, typename... P>
+	struct __rebind_fnptr<CallingConvention::__STDCALL, R, std::tuple<P...>>
+	{
+		using type = __stdcall_ptr_t<R, P...>; 
+	};
+
+	template <typename R, typename... P>
+	struct __rebind_fnptr<CallingConvention::__THISCALL, R, std::tuple<P...>>
+	{
+		using type = __thiscall_ptr_t<R, P...>; 
+	};
+
+#if !defined(_MANAGED)
+	template <typename R, typename... P>
+	struct __rebind_fnptr<CallingConvention::__VECTORCALL, R, std::tuple<P...>>
+	{
+		using type = __vectorcall_ptr_t<R, P...>; 
+	};
+#endif
+
+#if defined(__ARCH_X86_)
+	template <typename R, typename... P>
+	struct __rebind_fnptr<CallingConvention::__FASTCALL, R, std::tuple<P...>>
+	{
+		using type = __fastcall_ptr_t<R, P...>; 
+	};
+#endif
+
+#endif
+#endif
+
+	template <typename Fn, typename Tp, std::size_t... I, typename... A>
+	__FORCE_INLINE_
+	auto __invoke_declared(Fn fn, std::index_sequence<I...>, A&&... a)
+		-> decltype(fn(static_cast<std::tuple_element_t<I, Tp>>(detail::forward<A>(a))...))
+	{
+		return fn(static_cast<std::tuple_element_t<I, Tp>>(detail::forward<A>(a))...);
+	}
+
+#else
+
+template <typename> struct __km_sig;
+
+template <typename R, typename... P>
+struct __km_sig<R(P...)>
+{
+	using ret = R;
+
+	template <typename Fn, typename... A>
+	static __FORCE_INLINE_
+	R invoke(Fn fn, A&&... a)
+	{
+		return fn(static_cast<P>(detail::forward<A>(a))...);
+	}
+};
+
+template <CallingConvention CC, typename Sig> struct __km_rebind;
+
+template <typename R, typename... P>
+struct __km_rebind<CallingConvention::__CDECL, R(P...)>
+{
+	using type = R(__CDECL__*)(P...);
+}
+
+template <typename R, typename... P>
+struct __km_rebind<CallingConvention::__STDCALL, R(P...)>
+{
+	using type = R(__STDCALL__*)(P...);
+}
+
+template <typename R, typename... P>
+struct __km_rebind<CallingConvention::__THISCALL, R(P...)>
+{
+	using type = R(__THISCALL__*)(P...);
+}
+
+#if !defined(_MANAGED)
+template <typename R, typename... P>
+struct __km_rebind<CallingConvention::__VECTORCALL, R(P...)>
+{
+	using type = R(__VECTORCALL__*)(P...);
+}
+#endif
+
+#if defined(__ARCH_X86_)
+template <typename R, typename... P>
+struct __km_rebind<CallingConvention::__FASTCALL, R(P...)>
+{
+	using type = R(__FASTCALL__*)(P...);
+}
+#endif
+
+#endif
 
 	/* Encryption is done manually in kernel mode due to lack of STL
 	 * Using xoshiro256 encryption implementation for fast generation,
@@ -637,13 +1023,21 @@ namespace __StackObfuscator
 			if (all_same) __UNLIKELY_
 				return false;
 
+			/* Used to be `20 <= popcnt <= 44`,
+			 * but in an effort to reduce
+			 * MAX_ATTEMPTS pressure, I lowered
+			 * the bounds to 16 and 48.
+			 * with 20 and 44, it would reject
+			 * ~90% of uniformly random keys,
+			 * which caused many retries. */
+
 #if defined(__COMPILER_MSVC_)
-			const int popcount = __popcnt64(key);
-			return popcount >= 20 && popcount <= 44;
+			const auto popcount = __popcnt64(key);
+			return popcount >= 16 && popcount <= 48;
 #else
-#if __has_builtin(__builtin_popcountll)
-			const int popcount = __builtin_popcountll(key);
-			return popcount >= 20 && popcount <= 44;
+#if defined(__has_builtin) && __has_builtin(__builtin_popcountll)
+			const auto popcount = __builtin_popcountll(key);
+			return popcount >= 16 && popcount <= 48;
 #else
 			/* For old CPUs without popcount: 
 			 * check if upper and lower
@@ -698,15 +1092,33 @@ namespace __StackObfuscator
 			if (!state) __UNLIKELY_
 				return 0;
 
+			if (state->key_uses >= state->max_key_uses) __UNLIKELY_
+			{
+				generateNewKey(state);
+				state->key_uses = 0;
+			}
+
+			++state->key_uses;
+
 			return state->current_key;
 		}
 #else
-
 		static __FORCE_INLINE_
 		uintptr_t getKey(void) noexcept
 		{
-			if (current_key)
+			static thread_local int __uses = 0;
+
+			if (__uses >= key_uses_before_rotation) __UNLIKELY_
+			{
+				__uses = 0;
+				current_key = 0;
+			}
+
+			if (current_key) __LIKELY_
+			{
+				++__uses;
 				return current_key;
+			}
 
 			initThreadLocal();
 
@@ -728,75 +1140,45 @@ namespace __StackObfuscator
 				__SET_LAST_STATE(ObfuscateStatus::WEAK_ENCRYPTION_FALLBACK);
 			}
 
+			++__uses;
+
 			return current_key;
 		}
 #endif
 	};
 
 #if defined(__WINDOWS_KERNEL_)
-	__FORCE_INLINE_
-	void initThreadState(void) noexcept
-	{
-		if (!__ALLOW_TLS_OVERWRITE) __UNLIKELY_
-			return;
-
-		ThreadState* state = getThreadState();
-
-		KIRQL oldIrql;
-
-		KeAcquireSpinLock(&__LAST_THREAD_STATE_LOCK, &oldIrql);
-
-		if (!state) __UNLIKELY_
-		{
-			__LAST_THREAD_STATE = LastThreadStatus::INIT_FAILURE;
-			KeReleaseSpinLock(&__LAST_THREAD_STATE_LOCK, oldIrql);
-			return;
-		}
-
-		RtlZeroMemory(state, sizeof(ThreadState));
-
-		KeyGenerator::initThreadStateKey(state);
-
-		state->initialized	= TRUE;
-		state->last_state	= ObfuscateStatus::INITIALIZED;
-		__LAST_THREAD_STATE	= LastThreadStatus::INIT_SUCCESS;
-
-		KeReleaseSpinLock(&__LAST_THREAD_STATE_LOCK, oldIrql);
-	}
-
 	VOID __ThreadNotifyCallback(HANDLE ProcessId, HANDLE ThreadId, BOOLEAN Create) noexcept
 	{
 		UNREFERENCED_PARAMETER(ProcessId);
 		UNREFERENCED_PARAMETER(ThreadId);
 
-		KIRQL oldIrql;
-
 		if (Create)
 		{
-			KeAcquireSpinLock(&__LAST_THREAD_STATE_LOCK, &oldIrql);
 			__LAST_THREAD_STATE = LastThreadStatus::THREAD_IS_CREATING;
-			initThreadState();
-			KeReleaseSpinLock(&__LAST_THREAD_STATE_LOCK, oldIrql);
+			/* Lazy initialization, doing it here is cheap */
+			(void)getThreadState();
 		}
 		else
 		{
-			KeAcquireSpinLock(&__LAST_THREAD_STATE_LOCK, &oldIrql);
+			__ThreadLocal::__FreeThreadState(KeGetCurrentThread());
 			__LAST_THREAD_STATE = LastThreadStatus::THREAD_TERMINATED;
-			KeReleaseSpinLock(&__LAST_THREAD_STATE_LOCK, oldIrql);
 		}
 	}
 
 	__FORCE_INLINE_
 	NTSTATUS __RegisterThreadCleanup(void) noexcept
 	{
-		KeInitializeSpinLock(&__LAST_THREAD_STATE_LOCK);
+		__ThreadLocal::__InitKernelTlsBuckets();
 		return PsSetCreateThreadNotifyRoutine(__ThreadNotifyCallback);
 	}
 
 	__FORCE_INLINE_
 	NTSTATUS __UnregisterThreadCleanup(void) noexcept
 	{
-		return PsRemoveCreateThreadNotifyRoutine(__ThreadNotifyCallback);
+		const NTSTATUS st = PsRemoveCreateThreadNotifyRoutine(__ThreadNotifyCallback);
+		__ThreadLocal::__PurgeAllThreadStates();
+		return st;
 	}
 #endif
 
@@ -824,20 +1206,20 @@ namespace __StackObfuscator
 		}
 	}
 
-	class ObfuscateFunction
+	class __NO_SCS_ ObfuscateFunction
 	{
 	private:
-		const uintptr_t	xor_key;
-		void*			ret_addr	= nullptr;
-		bool			initialized	= false;
-		uintptr_t		tmp			= 0;
+		const uintptr_t		xor_key;
+		volatile uintptr_t*	ra_slot		= nullptr;
+		bool				initialized	= false;
+		uintptr_t			tmp			= 0;
 
 	public:
 		__NO_CFG_ __FORCE_INLINE_
-		ObfuscateFunction(void* addr) noexcept
-			: xor_key(KeyGenerator::getKey()), ret_addr(addr)
+		ObfuscateFunction(void* ret_addr) noexcept
+			: xor_key(KeyGenerator::getKey())
 		{
-			if (!addr) __UNLIKELY_
+			if (!ret_addr) __UNLIKELY_
 			{
 				__SET_LAST_STATE(ObfuscateStatus::INVALID_FUNCTION_ADDRESS);
 				return;
@@ -849,12 +1231,19 @@ namespace __StackObfuscator
 				return;
 			}
 
-			tmp = (*(uintptr_t*)ret_addr) ^ xor_key;
+			if (!__RA::__ra_tamper_allowed_cached()) __UNLIKELY_
+			{
+				__SET_LAST_STATE(ObfuscateStatus::RA_TAMPER_NOT_ALLOWED);
+				return;
+			}
+
+			ra_slot = reinterpret_cast<volatile uintptr_t*>(ret_addr);
+
+			tmp = *ra_slot ^ xor_key;
 			__MEMORY_BARRIER_();
-			*(uintptr_t*)ret_addr = 0;
+			*ra_slot = 0;
 
 			initialized = true;
-
 			__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
 		}
 
@@ -872,24 +1261,37 @@ namespace __StackObfuscator
 				return;
 			}
 
+			if (!__RA::__ra_tamper_allowed_cached()) __UNLIKELY_
+			{
+				__SET_LAST_STATE(ObfuscateStatus::RA_TAMPER_NOT_ALLOWED);
+				return;
+			}
+
 			if (!xor_key) __UNLIKELY_
 			{
 				__SET_LAST_STATE(ObfuscateStatus::INVALID_ENCRYPTION);
 				return;
 			}
 
-			*(uintptr_t*)ret_addr = tmp ^ xor_key;
+			*ra_slot = tmp ^ xor_key;
 
 			__MEMORY_BARRIER_();
-			__verify_return_addr(ret_addr);
+			__verify_return_addr(const_cast<void*>(
+				reinterpret_cast<volatile void*>(ra_slot))
+			);
+
 			__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
 		}
 	};
 
 	template <CallingConvention cc, typename RetType, typename Callable, typename... Args>
-	__NO_CFG_ __NO_STACK_PROTECT_
+	__NO_CFG_ __NO_SCS_ __NO_STACK_PROTECT_
 	RetType ShellCodeManager(Callable* f, Args&&... args) noexcept
 	{
+		static_assert(!detail::is_same<Callable, void>,
+			"Callable must be a real function type, did you pass a void* generic?"
+		);
+
 		OBFUSCATE_FUNCTION;
 
 		const uintptr_t	xor_key = KeyGenerator::getKey();
@@ -897,67 +1299,183 @@ namespace __StackObfuscator
 		if (!xor_key) __UNLIKELY_
 		{
 			__SET_LAST_STATE(ObfuscateStatus::INVALID_ENCRYPTION);
+
 			if constexpr (detail::is_same<RetType, void>)
 				return;
+
 			return RetType();
 		}
 
-		void* ret_addr = __RETURN_ADDR_PTR_();
-		__MEMORY_BARRIER_();
-		uintptr_t tmp = *(uintptr_t*)ret_addr ^ xor_key;
-		__MEMORY_BARRIER_();
-		*(uintptr_t*)ret_addr = 0;
+		void* ret_addr = nullptr;
+		uintptr_t tmp  = 0;
 
-		/* Unfortunately C++ only supports constexpr for if statements
-		 * So readability & portability is thrown out the window
-		 * In this case its appropriate to do so for efficiency */
+		bool ra_allowed = __RA::__ra_tamper_allowed_cached();
+
+		if (ra_allowed) __LIKELY_
+		{
+			ret_addr = __RETURN_ADDR_PTR_();
+			if (ret_addr) __LIKELY_
+			{
+				auto* ra = reinterpret_cast<volatile uintptr_t*>(ret_addr);
+				__MEMORY_BARRIER_();
+				tmp = *ra ^ xor_key;
+				__MEMORY_BARRIER_();
+				*ra = 0;
+			}
+			else
+				ra_allowed = false;
+		}
+
+		struct __restore_t
+		{
+			volatile uintptr_t*	ra_slot;
+			uintptr_t			tmp;
+			uintptr_t			xor_key;
+			bool				ra_allowed;
+
+			__FORCE_INLINE_ __NO_SCS_
+			void operator()() const noexcept
+			{
+				if (!ra_allowed || !ra_slot) __UNLIKELY_
+					return;
+
+				*ra_slot = tmp ^ xor_key;
+				__MEMORY_BARRIER_();
+				__verify_return_addr(const_cast<void*>(
+					reinterpret_cast<volatile void*>(ra_slot))
+				);
+			}
+		};
+
+		volatile uintptr_t* ra_slot = ra_allowed && ret_addr
+			? reinterpret_cast<volatile uintptr_t*>(ret_addr)
+			: nullptr;
+
+		__MAYBE_UNUSED_ __restore_t __restore{ ra_slot, tmp, xor_key, ra_allowed };
+
+		/* The purpose of the restructuring is to keep the callee's true prototype when calling.
+		 *
+		 * Historically this code did this:
+		 *     auto function = reinterpret_cast<Ret(__CDECL__*)(remove_reference_t<Args>...)>(f);
+		 * which rebuilds a prototype from the call-site argument types (Args...).
+		 *
+		 * The old approach was incorrect and could've been undefined behavior:
+		 *   - The rebuilt signature may not match the real function's signature
+		 *   due to scalars. (e.g. size_t vs int, const void* vs const char*, etc.).
+		 *   - This results in a warning: -Wcast-function-type because the cast
+		 *   lies about the function type and calling convention.
+		 *   - Even if the ABI happens to pass the same bits, it is not guaranteed.
+		 *
+		 * Therefore, I now instead made it to preserve the original function type
+		 * so the call is performed with the actual prototype. Then normal C++
+		 * conversions apply at the call-site (e.g., int->size_t, const char[N] -> const char*,
+		 * and const void* where needed) without any undefined behavior or warnings.
+		 *
+		 * On GCC/Clang we therefore avoid any reinterpret_cast and maintain the
+		 * exact pointer type, which removes warnings and is ABI safe.
+		 *
+		 * On MSVC, calling conventions are encoded in the type. To ensure the intended
+		 * Calling convention is stamped into the pointer type, we rebind the function
+		 * pointer by type, not by call-site argument deduction. That keeps real parameter
+		 * and return types while adding the desired calling convention to the type.
+		 *
+		 * When I originally made this, I intended to do this, but I could not for the
+		 * life of me figure out how. There was nothing online that I could find at the time,
+		 * and I was not advanced enough in the language to figure it out. I had tried many
+		 * approaches, but in the end I wasn't able, and kept the undefined behavior approach
+		 * since if we used the correct ABI macro, the undefined behavior proved reliable and
+		 * consistent. And while in practice that would always work to be fair, this is better. */
 
 		if constexpr (cc == CallingConvention::__CDECL)
 		{
-			auto function = reinterpret_cast<RetType(__CDECL__*)(remove_reference_t<Args>...)>(f);
-			if constexpr (detail::is_same<RetType, void>)
+#if defined(__WINDOWS_KERNEL_)
+			using traits	= __km_sig<Callable>;
+			using Ret		= typename traits::ret;
+
+			using fnptr_t	= typename __km_rebind<CallingConvention::__CDECL, Callable>::type;
+			auto function	= reinterpret_cast<fnptr_t>(f);
+#else
+			using traits	= __fn_sig<Callable>;
+			using Ret		= typename traits::ret;
+#if defined(__COMPILER_MSVC_)
+			using Params	= typename traits::params;
+			using fnptr_t	= typename __rebind_fnptr<CallingConvention::__CDECL, Ret, Params>::type;
+			auto function	= reinterpret_cast<fnptr_t>(f);
+#else
+			auto function	= f;
+#endif
+#endif
+			if constexpr (detail::is_same<Ret, void>)
 			{
+#if defined(__WINDOWS_KERNEL_)
+				traits::invoke(function, detail::forward<Args>(args)...);
+#else
 				function(detail::forward<Args>(args)...);
+#endif
 				__MEMORY_BARRIER_();
-				*(uintptr_t*)ret_addr = tmp ^ xor_key;
-				__MEMORY_BARRIER_();
-				__verify_return_addr(ret_addr);
-				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+				__restore();
+				__SET_LAST_STATE(ra_allowed ? ObfuscateStatus::SUCCEEDED
+											: ObfuscateStatus::RA_TAMPER_NOT_ALLOWED);
 				return;
 			}
 			else
 			{
-				RetType ret = function(detail::forward<Args>(args)...);
+#if defined(__WINDOWS_KERNEL_)
+				Ret ret = traits::invoke(function, detail::forward<Args>(args)...);
+#else
+				Ret ret = function(detail::forward<Args>(args)...);
+#endif
 				__MEMORY_BARRIER_();
-				*(uintptr_t*)ret_addr = tmp ^ xor_key;
-				__MEMORY_BARRIER_();
-				__verify_return_addr(ret_addr);
-				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+				__restore();
+				__SET_LAST_STATE(ra_allowed ? ObfuscateStatus::SUCCEEDED
+											: ObfuscateStatus::RA_TAMPER_NOT_ALLOWED);
 				return ret;
 			}
 		}
 #if defined(__PLATFORM_WINDOWS_)
 		else if constexpr (cc == CallingConvention::__STDCALL)
 		{
-			auto function = reinterpret_cast<RetType(__STDCALL__*)(remove_reference_t<Args>...)>(f);
-			if constexpr (detail::is_same<RetType, void>)
+#if defined(__WINDOWS_KERNEL_)
+			using traits	= __km_sig<Callable>;
+			using Ret		= typename traits::ret;
+
+			using fnptr_t	= typename __km_rebind<CallingConvention::__STDCALL, Callable>::type;
+			auto function	= reinterpret_cast<fnptr_t>(f);
+#else
+			using traits	= __fn_sig<Callable>;
+			using Ret		= typename traits::ret;
+#if defined(__COMPILER_MSVC_)
+			using Params	= typename traits::params;
+			using fnptr_t	= typename __rebind_fnptr<CallingConvention::__STDCALL, Ret, Params>::type;
+			auto function	= reinterpret_cast<fnptr_t>(f);
+#else
+			auto function	= f;
+#endif
+#endif
+			if constexpr (detail::is_same<Ret, void>)
 			{
+#if defined(__WINDOWS_KERNEL_)
+				traits::invoke(function, detail::forward<Args>(args)...);
+#else
 				function(detail::forward<Args>(args)...);
+#endif
 				__MEMORY_BARRIER_();
-				*(uintptr_t*)ret_addr = tmp ^ xor_key;
-				__MEMORY_BARRIER_();
-				__verify_return_addr(ret_addr);
-				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+				__restore();
+				__SET_LAST_STATE(ra_allowed ? ObfuscateStatus::SUCCEEDED
+											: ObfuscateStatus::RA_TAMPER_NOT_ALLOWED);
 				return;
 			}
 			else
 			{
-				RetType ret = function(detail::forward<Args>(args)...);
+#if defined(__WINDOWS_KERNEL_)
+				Ret ret = traits::invoke(function, detail::forward<Args>(args)...);
+#else
+				Ret ret = function(detail::forward<Args>(args)...);
+#endif
 				__MEMORY_BARRIER_();
-				*(uintptr_t*)ret_addr = tmp ^ xor_key;
-				__MEMORY_BARRIER_();
-				__verify_return_addr(ret_addr);
-				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+				__restore();
+				__SET_LAST_STATE(ra_allowed ? ObfuscateStatus::SUCCEEDED
+											: ObfuscateStatus::RA_TAMPER_NOT_ALLOWED);
 				return ret;
 			}
 		}
@@ -965,55 +1483,94 @@ namespace __StackObfuscator
 #if defined(__PLATFORM_WINDOWS_) && defined(_MANAGED)
 		else if constexpr (cc == CallingConvention::__CLRCALL)
 		{
-			auto function = reinterpret_cast<RetType(__clrcall*)(remove_reference_t<Args>...)>(f);
-			if constexpr (detail::is_same<RetType, void>)
-			{
-				function(detail::forward<Args>(args)...);
-				__MEMORY_BARRIER_();
-				*(uintptr_t*)ret_addr = tmp ^ xor_key;
-				__MEMORY_BARRIER_();
-				__verify_return_addr(ret_addr);
-				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+#if defined(__WINDOWS_KERNEL_)
+			using traits	= __km_sig<Callable>;
+			using Ret		= typename traits::ret;
 
+			using fnptr_t	= typename __km_rebind<CallingConvention::__CLRCALL, Callable>::type;
+			auto function	= reinterpret_cast<fnptr_t>(f);
+#else
+			using traits	= __fn_sig<Callable>;
+			using Ret		= typename traits::ret;
+#if defined(__COMPILER_MSVC_)
+			using Params	= typename traits::params;
+			using fnptr_t	= typename __rebind_fnptr<CallingConvention::__CLRCALL, Ret, Params>::type;
+			auto function	= reinterpret_cast<fnptr_t>(f);
+#else
+			auto function	= f;
+#endif
+#endif
+			if constexpr (detail::is_same<Ret, void>)
+			{
+#if defined(__WINDOWS_KERNEL_)
+				traits::invoke(function, detail::forward<Args>(args)...);
+#else
+				function(detail::forward<Args>(args)...);
+#endif
+				__MEMORY_BARRIER_();
+				__restore();
+				__SET_LAST_STATE(ra_allowed ? ObfuscateStatus::SUCCEEDED
+											: ObfuscateStatus::RA_TAMPER_NOT_ALLOWED);
 				return;
 			}
 			else
 			{
-				RetType ret = function(detail::forward<Args>(args)...);
+#if defined(__WINDOWS_KERNEL_)
+				Ret ret = traits::invoke(function, detail::forward<Args>(args)...);
+#else
+				Ret ret = function(detail::forward<Args>(args)...);
+#endif
 				__MEMORY_BARRIER_();
-				*(uintptr_t*)ret_addr = tmp ^ xor_key;
-				__MEMORY_BARRIER_();
-				__verify_return_addr(ret_addr);
-				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
-
+				__restore();
+				__SET_LAST_STATE(ra_allowed ? ObfuscateStatus::SUCCEEDED
+											: ObfuscateStatus::RA_TAMPER_NOT_ALLOWED);
 				return ret;
 			}
 		}
-
 #elif defined(__PLATFORM_WINDOWS_) && !defined(__COMPILER_GCC_) && !defined(_MANAGED)
 		else if constexpr (cc == CallingConvention::__VECTORCALL)
 		{
-			auto function = reinterpret_cast<RetType(__VECTORCALL__*)(remove_reference_t<Args>...)>(f);
-			if constexpr (detail::is_same<RetType, void>)
-			{
-				function(detail::forward<Args>(args)...);
-				__MEMORY_BARRIER_();
-				*(uintptr_t*)ret_addr = tmp ^ xor_key;
-				__MEMORY_BARRIER_();
-				__verify_return_addr(ret_addr);
-				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+#if defined(__WINDOWS_KERNEL_)
+			using traits	= __km_sig<Callable>;
+			using Ret		= typename traits::ret;
 
+			using fnptr_t	= typename __km_rebind<CallingConvention::__VECTORCALL, Callable>::type;
+			auto function	= reinterpret_cast<fnptr_t>(f);
+#else
+			using traits	= __fn_sig<Callable>;
+			using Ret		= typename traits::ret;
+#if defined(__COMPILER_MSVC_)
+			using Params	= typename traits::params;
+			using fnptr_t	= typename __rebind_fnptr<CallingConvention::__VECTORCALL, Ret, Params>::type;
+			auto function	= reinterpret_cast<fnptr_t>(f);
+#else
+			auto function	= f;
+#endif
+#endif
+			if constexpr (detail::is_same<Ret, void>)
+			{
+#if defined(__WINDOWS_KERNEL_)
+				traits::invoke(function, detail::forward<Args>(args)...);
+#else
+				function(detail::forward<Args>(args)...);
+#endif
+				__MEMORY_BARRIER_();
+				__restore();
+				__SET_LAST_STATE(ra_allowed ? ObfuscateStatus::SUCCEEDED
+											: ObfuscateStatus::RA_TAMPER_NOT_ALLOWED);
 				return;
 			}
 			else
 			{
-				RetType ret = function(detail::forward<Args>(args)...);
+#if defined(__WINDOWS_KERNEL_)
+				Ret ret = traits::invoke(function, detail::forward<Args>(args)...);
+#else
+				Ret ret = function(detail::forward<Args>(args)...);
+#endif
 				__MEMORY_BARRIER_();
-				*(uintptr_t*)ret_addr = tmp ^ xor_key;
-				__MEMORY_BARRIER_();
-				__verify_return_addr(ret_addr);
-				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
-
+				__restore();
+				__SET_LAST_STATE(ra_allowed ? ObfuscateStatus::SUCCEEDED
+											: ObfuscateStatus::RA_TAMPER_NOT_ALLOWED);
 				return ret;
 			}
 		}
@@ -1021,25 +1578,47 @@ namespace __StackObfuscator
 #if defined(__PLATFORM_WINDOWS_) && !defined(__ARCH_X64_) && !defined(__ARCH_ARM64_)
 		else if constexpr (cc == CallingConvention::__FASTCALL)
 		{
-			auto function = reinterpret_cast<RetType(__FASTCALL__*)(remove_reference_t<Args>...)>(f);
-			if constexpr (detail::is_same<RetType, void>)
+#if defined(__WINDOWS_KERNEL_)
+			using traits	= __km_sig<Callable>;
+			using Ret		= typename traits::ret;
+
+			using fnptr_t	= typename __km_rebind<CallingConvention::__FASTCALL, Callable>::type;
+			auto function	= reinterpret_cast<fnptr_t>(f);
+#else
+			using traits	= __fn_sig<Callable>;
+			using Ret		= typename traits::ret;
+#if defined(__COMPILER_MSVC_)
+			using Params	= typename traits::params;
+			using fnptr_t	= typename __rebind_fnptr<CallingConvention::__FASTCALL, Ret, Params>::type;
+			auto function	= reinterpret_cast<fnptr_t>(f);
+#else
+			auto function	= f;
+#endif
+#endif
+			if constexpr (detail::is_same<Ret, void>)
 			{
+#if defined(__WINDOWS_KERNEL_)
+				traits::invoke(function, detail::forward<Args>(args)...);
+#else
 				function(detail::forward<Args>(args)...);
+#endif
 				__MEMORY_BARRIER_();
-				*(uintptr_t*)ret_addr = tmp ^ xor_key;
-				__MEMORY_BARRIER_();
-				__verify_return_addr(ret_addr);
-				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+				__restore();
+				__SET_LAST_STATE(ra_allowed ? ObfuscateStatus::SUCCEEDED
+											: ObfuscateStatus::RA_TAMPER_NOT_ALLOWED);
 				return;
 			}
 			else
 			{
-				RetType ret = function(detail::forward<Args>(args)...);
+#if defined(__WINDOWS_KERNEL_)
+				Ret ret = traits::invoke(function, detail::forward<Args>(args)...);
+#else
+				Ret ret = function(detail::forward<Args>(args)...);
+#endif
 				__MEMORY_BARRIER_();
-				*(uintptr_t*)ret_addr = tmp ^ xor_key;
-				__MEMORY_BARRIER_();
-				__verify_return_addr(ret_addr);
-				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+				__restore();
+				__SET_LAST_STATE(ra_allowed ? ObfuscateStatus::SUCCEEDED
+											: ObfuscateStatus::RA_TAMPER_NOT_ALLOWED);
 				return ret;
 			}
 		}
@@ -1047,25 +1626,47 @@ namespace __StackObfuscator
 #if defined(__PLATFORM_WINDOWS_)
 		else if constexpr (cc == CallingConvention::__THISCALL)
 		{
-			auto function = reinterpret_cast<RetType(__THISCALL__*)(remove_reference_t<Args>...)>(f);
-			if constexpr (detail::is_same<RetType, void>)
+#if defined(__WINDOWS_KERNEL_)
+			using traits	= __km_sig<Callable>;
+			using Ret		= typename traits::ret;
+
+			using fnptr_t	= typename __km_rebind<CallingConvention::__THISCALL, Callable>::type;
+			auto function	= reinterpret_cast<fnptr_t>(f);
+#else
+			using traits	= __fn_sig<Callable>;
+			using Ret		= typename traits::ret;
+#if defined(__COMPILER_MSVC_)
+			using Params	= typename traits::params;
+			using fnptr_t	= typename __rebind_fnptr<CallingConvention::__THISCALL, Ret, Params>::type;
+			auto function	= reinterpret_cast<fnptr_t>(f);
+#else
+			auto function	= f;
+#endif
+#endif
+			if constexpr (detail::is_same<Ret, void>)
 			{
+#if defined(__WINDOWS_KERNEL_)
+				traits::invoke(function, detail::forward<Args>(args)...);
+#else
 				function(detail::forward<Args>(args)...);
+#endif
 				__MEMORY_BARRIER_();
-				*(uintptr_t*)ret_addr = tmp ^ xor_key;
-				__MEMORY_BARRIER_();
-				__verify_return_addr(ret_addr);
-				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+				__restore();
+				__SET_LAST_STATE(ra_allowed ? ObfuscateStatus::SUCCEEDED
+											: ObfuscateStatus::RA_TAMPER_NOT_ALLOWED);
 				return;
 			}
 			else
 			{
-				RetType ret = function(detail::forward<Args>(args)...);
+#if defined(__WINDOWS_KERNEL_)
+				Ret ret = traits::invoke(function, detail::forward<Args>(args)...);
+#else
+				Ret ret = function(detail::forward<Args>(args)...);
+#endif
 				__MEMORY_BARRIER_();
-				*(uintptr_t*)ret_addr = tmp ^ xor_key;
-				__MEMORY_BARRIER_();
-				__verify_return_addr(ret_addr);
-				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+				__restore();
+				__SET_LAST_STATE(ra_allowed ? ObfuscateStatus::SUCCEEDED
+											: ObfuscateStatus::RA_TAMPER_NOT_ALLOWED);
 				return ret;
 			}
 		}
@@ -1073,25 +1674,47 @@ namespace __StackObfuscator
 #if defined(__PLATFORM_LINUX_) && !defined(__COMPILER_MSVC_)
 		else if constexpr (cc == CallingConvention::__MS_ABI)
 		{
-			auto function = reinterpret_cast<RetType(__MS_ABI__*)(remove_reference_t<Args>...)>(f);
-			if constexpr (detail::is_same<RetType, void>)
+#if defined(__WINDOWS_KERNEL_)
+			using traits	= __km_sig<Callable>;
+			using Ret		= typename traits::ret;
+
+			using fnptr_t	= typename __km_rebind<CallingConvention::__MS_ABI, Callable>::type;
+			auto function	= reinterpret_cast<fnptr_t>(f);
+#else
+			using traits	= __fn_sig<Callable>;
+			using Ret		= typename traits::ret;
+#if defined(__COMPILER_MSVC_)
+			using Params	= typename traits::params;
+			using fnptr_t	= typename __rebind_fnptr<CallingConvention::__MS_ABI, Ret, Params>::type;
+			auto function	= reinterpret_cast<fnptr_t>(f);
+#else
+			auto function	= f;
+#endif
+#endif
+			if constexpr (detail::is_same<Ret, void>)
 			{
+#if defined(__WINDOWS_KERNEL_)
+				traits::invoke(function, detail::forward<Args>(args)...);
+#else
 				function(detail::forward<Args>(args)...);
+#endif
 				__MEMORY_BARRIER_();
-				*(uintptr_t*)ret_addr = tmp ^ xor_key;
-				__MEMORY_BARRIER_();
-				__verify_return_addr(ret_addr);
-				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+				__restore();
+				__SET_LAST_STATE(ra_allowed ? ObfuscateStatus::SUCCEEDED
+											: ObfuscateStatus::RA_TAMPER_NOT_ALLOWED);
 				return;
 			}
 			else
 			{
-				RetType ret = function(detail::forward<Args>(args)...);
+#if defined(__WINDOWS_KERNEL_)
+				Ret ret = traits::invoke(function, detail::forward<Args>(args)...);
+#else
+				Ret ret = function(detail::forward<Args>(args)...);
+#endif
 				__MEMORY_BARRIER_();
-				*(uintptr_t*)ret_addr = tmp ^ xor_key;
-				__MEMORY_BARRIER_();
-				__verify_return_addr(ret_addr);
-				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+				__restore();
+				__SET_LAST_STATE(ra_allowed ? ObfuscateStatus::SUCCEEDED
+											: ObfuscateStatus::RA_TAMPER_NOT_ALLOWED);
 				return ret;
 			}
 		}
@@ -1099,25 +1722,47 @@ namespace __StackObfuscator
 #if defined(__COMPILER_GCC_) || defined(__COMPILER_CLANG_)
 		else if constexpr (cc == CallingConvention::__SYSV_ABI)
 		{
-			auto function = reinterpret_cast<RetType(__SYSV_ABI__*)(remove_reference_t<Args>...)>(f);
-			if constexpr (detail::is_same<RetType, void>)
+#if defined(__WINDOWS_KERNEL_)
+			using traits	= __km_sig<Callable>;
+			using Ret		= typename traits::ret;
+
+			using fnptr_t	= typename __km_rebind<CallingConvention::__SYSV_ABI, Callable>::type;
+			auto function	= reinterpret_cast<fnptr_t>(f);
+#else
+			using traits	= __fn_sig<Callable>;
+			using Ret		= typename traits::ret;
+#if defined(__COMPILER_MSVC_)
+			using Params	= typename traits::params;
+			using fnptr_t	= typename __rebind_fnptr<CallingConvention::__SYSV_ABI, Ret, Params>::type;
+			auto function	= reinterpret_cast<fnptr_t>(f);
+#else
+			auto function	= f;
+#endif
+#endif
+			if constexpr (detail::is_same<Ret, void>)
 			{
+#if defined(__WINDOWS_KERNEL_)
+				traits::invoke(function, detail::forward<Args>(args)...);
+#else
 				function(detail::forward<Args>(args)...);
+#endif
 				__MEMORY_BARRIER_();
-				*(uintptr_t*)ret_addr = tmp ^ xor_key;
-				__MEMORY_BARRIER_();
-				__verify_return_addr(ret_addr);
-				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+				__restore();
+				__SET_LAST_STATE(ra_allowed ? ObfuscateStatus::SUCCEEDED
+											: ObfuscateStatus::RA_TAMPER_NOT_ALLOWED);
 				return;
 			}
 			else
 			{
-				RetType ret = function(detail::forward<Args>(args)...);
+#if defined(__WINDOWS_KERNEL_)
+				Ret ret = traits::invoke(function, detail::forward<Args>(args)...);
+#else
+				Ret ret = function(detail::forward<Args>(args)...);
+#endif
 				__MEMORY_BARRIER_();
-				*(uintptr_t*)ret_addr = tmp ^ xor_key;
-				__MEMORY_BARRIER_();
-				__verify_return_addr(ret_addr);
-				__SET_LAST_STATE(ObfuscateStatus::SUCCEEDED);
+				__restore();
+				__SET_LAST_STATE(ra_allowed ? ObfuscateStatus::SUCCEEDED
+											: ObfuscateStatus::RA_TAMPER_NOT_ALLOWED);
 				return ret;
 			}
 		}
@@ -1126,10 +1771,8 @@ namespace __StackObfuscator
 		__SET_LAST_STATE(ObfuscateStatus::INVALID_CALLING_CONVENTION);
 
 		__MEMORY_BARRIER_();
-		*(uintptr_t*)ret_addr = tmp ^ xor_key;
-		__MEMORY_BARRIER_();
+		__restore();
 
-		__verify_return_addr(ret_addr);
 		if constexpr (!detail::is_same<RetType, void>)
 			return RetType();
 	}
@@ -1164,7 +1807,8 @@ namespace __StackObfuscator
 				return RetType();
 			}
 
-			return ShellCodeManager<cc, RetType, Callable, Args...>(f, detail::forward<Args>(args)...);
+			return ShellCodeManager<cc, RetType, Callable, Args...>(
+									f, detail::forward<Args>(args)...);
 		}
 	};
 	}
