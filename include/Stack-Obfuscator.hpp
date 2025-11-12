@@ -1905,6 +1905,6 @@ struct __km_rebind<CallingConvention::__FASTCALL, R(P...)>
 #ifdef __SYSV_ABI__
 #undef __SYSV_ABI__
 #endif
-#ifdef __RETURN_ADDR_PTR_
-#undef __RETURN_ADDR_PTR_
+#ifdef __KEY_USES_ROTATION_DEFAULT
+#undef __KEY_USES_ROTATION_DEFAULT
 #endif
