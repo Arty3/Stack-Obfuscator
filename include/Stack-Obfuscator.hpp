@@ -1815,3 +1815,96 @@ struct __km_rebind<CallingConvention::__FASTCALL, R(P...)>
 	};
 	}
 }
+
+/* Undefine implementation macros to keep global namespace clean */
+
+#ifdef __COMPILER_MSVC_
+#undef __COMPILER_MSVC_
+#endif
+#ifdef __COMPILER_CLANG_
+#undef __COMPILER_CLANG_
+#endif
+#ifdef __COMPILER_GCC_
+#undef __COMPILER_GCC_
+#endif
+#ifdef __PLATFORM_WINDOWS_
+#undef __PLATFORM_WINDOWS_
+#endif
+#ifdef __PLATFORM_LINUX_
+#undef __PLATFORM_LINUX_
+#endif
+#ifdef __WINDOWS_KERNEL_
+#undef __WINDOWS_KERNEL_
+#endif
+#ifdef __ARCH_X64_
+#undef __ARCH_X64_
+#endif
+#ifdef __ARCH_X86_
+#undef __ARCH_X86_
+#endif
+#ifdef __ARCH_ARM64_
+#undef __ARCH_ARM64_
+#endif
+#ifdef __FORCE_INLINE_
+#undef __FORCE_INLINE_
+#endif
+#ifdef __NO_INLINE_
+#undef __NO_INLINE_
+#endif
+#ifdef __NO_STACK_PROTECT_
+#undef __NO_STACK_PROTECT_
+#endif
+#ifdef __NO_CFG_
+#undef __NO_CFG_
+#endif
+#ifdef __ALIGN_
+#undef __ALIGN_
+#endif
+#ifdef __RESTRICT_
+#undef __RESTRICT_
+#endif
+#ifdef __DEPRECATED_
+#undef __DEPRECATED_
+#endif
+#ifdef __NO_SCS_
+#undef __NO_SCS_
+#endif
+#ifdef __UNLIKELY_
+#undef __UNLIKELY_
+#endif
+#ifdef __LIKELY_
+#undef __LIKELY_
+#endif
+#ifdef __MAYBE_UNUSED_
+#undef __MAYBE_UNUSED_
+#endif
+#ifdef __DISCARD_BRANCH_
+#undef __DISCARD_BRANCH_
+#endif
+#ifdef __MEMORY_BARRIER_
+#undef __MEMORY_BARRIER_
+#endif
+#ifdef __CDECL__
+#undef __CDECL__
+#endif
+#ifdef __STDCALL__
+#undef __STDCALL__
+#endif
+#ifdef __VECTORCALL__
+#undef __VECTORCALL__
+#endif
+#ifdef __FASTCALL__
+#undef __FASTCALL__
+#endif
+#ifdef __THISCALL__
+#undef __THISCALL__
+#endif
+#ifdef __MS_ABI__
+#undef __MS_ABI__
+#endif
+#ifdef __SYSV_ABI__
+#undef __SYSV_ABI__
+#endif
+#ifdef __RETURN_ADDR_PTR_
+#undef __RETURN_ADDR_PTR_
+#endif
